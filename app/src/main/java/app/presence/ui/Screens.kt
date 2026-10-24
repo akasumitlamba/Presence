@@ -13,6 +13,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -61,6 +62,7 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -153,8 +155,10 @@ fun PresenceRoot() {
         ready = true
     }
     if (!ready) {
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-            Text("Presence", style = MaterialTheme.typography.headlineMedium)
+        PresenceTheme(androidx.compose.foundation.isSystemInDarkTheme()) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+                Text("Presence", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineMedium)
+            }
         }
         return
     }
@@ -246,13 +250,17 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     } else {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
             bottomBar = {
-                NavigationBar {
-                    NavigationBarItem(selected = tab == "timer", onClick = { tab = "timer"; pairing = false }, icon = { Icon(Icons.Filled.Timer, t.timer) }, label = { Text(t.timer) })
-                    NavigationBarItem(selected = tab == "projects", onClick = { tab = "projects"; pairing = false }, icon = { Icon(Icons.Filled.Folder, t.projects) }, label = { Text(t.projects) })
-                    NavigationBarItem(selected = tab == "todos", onClick = { tab = "todos"; pairing = false }, icon = { Icon(Icons.Filled.Check, t.todos) }, label = { Text(t.todos) })
-                    NavigationBarItem(selected = tab == "stats", onClick = { tab = "stats"; pairing = false }, icon = { Icon(Icons.Filled.BarChart, t.stats) }, label = { Text(t.stats) })
-                    NavigationBarItem(selected = tab == "settings", onClick = { tab = "settings"; pairing = false }, icon = { Icon(Icons.Filled.Settings, t.settings) }, label = { Text(t.settings) })
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ) {
+                    NavigationBarItem(selected = tab == "timer", onClick = { tab = "timer"; pairing = false }, icon = { Icon(Icons.Filled.Timer, t.timer) }, label = { Text(t.timer) }, colors = presenceNavColors())
+                    NavigationBarItem(selected = tab == "projects", onClick = { tab = "projects"; pairing = false }, icon = { Icon(Icons.Filled.Folder, t.projects) }, label = { Text(t.projects) }, colors = presenceNavColors())
+                    NavigationBarItem(selected = tab == "todos", onClick = { tab = "todos"; pairing = false }, icon = { Icon(Icons.Filled.Check, t.todos) }, label = { Text(t.todos) }, colors = presenceNavColors())
+                    NavigationBarItem(selected = tab == "stats", onClick = { tab = "stats"; pairing = false }, icon = { Icon(Icons.Filled.BarChart, t.stats) }, label = { Text(t.stats) }, colors = presenceNavColors())
+                    NavigationBarItem(selected = tab == "settings", onClick = { tab = "settings"; pairing = false }, icon = { Icon(Icons.Filled.Settings, t.settings) }, label = { Text(t.settings) }, colors = presenceNavColors())
                 }
             },
         ) { padding ->
@@ -263,19 +271,27 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
 
 @Composable
 private fun Rail(t: T, tab: String, onTab: (String) -> Unit) {
-    NavigationRail {
-        NavigationRailItem(selected = tab == "timer", onClick = { onTab("timer") }, icon = { Icon(Icons.Filled.Timer, t.timer) }, label = { Text(t.timer) })
-        NavigationRailItem(selected = tab == "projects", onClick = { onTab("projects") }, icon = { Icon(Icons.Filled.Folder, t.projects) }, label = { Text(t.projects) })
-        NavigationRailItem(selected = tab == "todos", onClick = { onTab("todos") }, icon = { Icon(Icons.Filled.Check, t.todos) }, label = { Text(t.todos) })
-        NavigationRailItem(selected = tab == "stats", onClick = { onTab("stats") }, icon = { Icon(Icons.Filled.BarChart, t.stats) }, label = { Text(t.stats) })
-        NavigationRailItem(selected = tab == "settings", onClick = { onTab("settings") }, icon = { Icon(Icons.Filled.Settings, t.settings) }, label = { Text(t.settings) })
+    NavigationRail(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        NavigationRailItem(selected = tab == "timer", onClick = { onTab("timer") }, icon = { Icon(Icons.Filled.Timer, t.timer) }, label = { Text(t.timer) }, colors = presenceRailColors())
+        NavigationRailItem(selected = tab == "projects", onClick = { onTab("projects") }, icon = { Icon(Icons.Filled.Folder, t.projects) }, label = { Text(t.projects) }, colors = presenceRailColors())
+        NavigationRailItem(selected = tab == "todos", onClick = { onTab("todos") }, icon = { Icon(Icons.Filled.Check, t.todos) }, label = { Text(t.todos) }, colors = presenceRailColors())
+        NavigationRailItem(selected = tab == "stats", onClick = { onTab("stats") }, icon = { Icon(Icons.Filled.BarChart, t.stats) }, label = { Text(t.stats) }, colors = presenceRailColors())
+        NavigationRailItem(selected = tab == "settings", onClick = { onTab("settings") }, icon = { Icon(Icons.Filled.Settings, t.settings) }, label = { Text(t.settings) }, colors = presenceRailColors())
     }
 }
 
 @Composable
 private fun Mini(t: T, snap: Snap, shown: Long, onOpen: () -> Unit) {
     val app = LocalContext.current.applicationContext as PresenceApp
-    Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
+    ) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(phase(t, snap.kind), style = MaterialTheme.typography.labelLarge)
@@ -335,11 +351,11 @@ private fun TimerPage(
     }
     val notificationsOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
     val controls: @Composable () -> Unit = {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 projects.forEach { item ->
                     val locked = !premium && item.id !in free
-                    FilterChip(
+                    PresenceChip(
                         selected = item.id == selected,
                         onClick = {
                             if (locked) onGate() else {
@@ -354,11 +370,11 @@ private fun TimerPage(
             if (tasks.isNotEmpty()) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     tasks.forEach { item ->
-                        FilterChip(selected = item.id == taskId, onClick = { taskId = if (taskId == item.id) null else item.id }, label = { Text(item.f("title")) })
+                        PresenceChip(selected = item.id == taskId, onClick = { taskId = if (taskId == item.id) null else item.id }, label = { Text(item.f("title")) })
                     }
                 }
             }
-            Button(onClick = {
+            PresenceButton(onClick = {
                 when (snap.status) {
                     "running" -> app.center.pause()
                     "paused" -> app.center.resume()
@@ -371,14 +387,14 @@ private fun TimerPage(
             }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(primary) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (snap.status == "idle") {
-                    FilledTonalButton(onClick = {
+                    TonalButton(onClick = {
                         if (project != null && !premium && project.id !in free) onGate() else app.center.start("track", project, task)
                     }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
                 }
                 if (snap.status == "running" || snap.status == "paused") {
-                    FilledTonalButton(onClick = { app.center.stop() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.stop) }
+                    TonalButton(onClick = { app.center.stop() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.stop) }
                     if (snap.kind != "track") {
-                        FilledTonalButton(onClick = { app.center.skip() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.skip) }
+                        TonalButton(onClick = { app.center.skip() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.skip) }
                     }
                 }
             }
@@ -404,7 +420,7 @@ private fun TimerPage(
         }
     }
     if (wide) {
-        Row(Modifier.fillMaxSize().padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { ring() }
             Column(Modifier.weight(1f)) { controls() }
         }
@@ -456,15 +472,15 @@ private fun ProjectsPage(
         Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (tags.isNotEmpty()) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text(t.all) })
+                    PresenceChip(selected = filter == null, onClick = { filter = null }, label = { Text(t.all) })
                     tags.forEach { tag ->
-                        FilterChip(selected = filter == tag.id, onClick = { filter = if (filter == tag.id) null else tag.id }, label = { Text(tag.f("name")) })
+                        PresenceChip(selected = filter == tag.id, onClick = { filter = if (filter == tag.id) null else tag.id }, label = { Text(tag.f("name")) })
                     }
                 }
             }
             if (visible.isEmpty()) {
                 Text(t.emptyProjects, style = MaterialTheme.typography.titleLarge)
-                Button(onClick = {
+                PresenceButton(onClick = {
                     if (!premium && projects.size >= FREE_PROJECTS) onGate() else creating = true
                 }) { Text(t.newProject) }
             }
@@ -485,14 +501,16 @@ private fun ProjectsPage(
                         if (dayKey(start, zone, dayStart) != today) 0L else sessionCountedMillis(rec)
                     }
                     Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         shape = MaterialTheme.shapes.large,
-                        tonalElevation = 1.dp,
                         modifier = Modifier.fillMaxWidth().combinedClickable(
                             onClick = { onSelect(project.id) },
                             onLongClick = { menuFor = project.id },
                         ),
                     ) {
-                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(18.dp).clip(CircleShape).background(colorOf(project.f("color"))))
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
@@ -520,7 +538,7 @@ private fun ProjectsPage(
                     }
                 }
             }
-            Button(onClick = {
+            PresenceButton(onClick = {
                 if (!premium && projects.size >= FREE_PROJECTS) onGate() else creating = true
             }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.newProject) }
             TextButton(onClick = { if (premium) newGroup = true else onGate() }) { Text(t.newGroup) }
@@ -529,7 +547,7 @@ private fun ProjectsPage(
     val detail: @Composable (Modifier) -> Unit = { modifier ->
         val project = projects.find { it.id == selectedId }
         if (project == null) {
-            Box(modifier.padding(24.dp), contentAlignment = Alignment.Center) { Text(t.chooseProject, style = MaterialTheme.typography.titleLarge) }
+            Box(modifier.padding(16.dp), contentAlignment = Alignment.Center) { Text(t.chooseProject, style = MaterialTheme.typography.titleLarge) }
         } else {
             ProjectDetail(app, t, rows, project, premium, modifier, onGate)
         }
@@ -667,10 +685,10 @@ private fun ProjectDetail(
     val globals = app.repo.globals()
     val worked = workedMillisFor(rows, project.id)
     val shownTasks = tasks.filter { taskFilter == null || it.f("tags").split(",").contains(taskFilter) }
-    Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        OutlinedTextField(name, { name = it }, label = { Text(t.name) }, modifier = Modifier.fillMaxWidth())
-        Button(onClick = {
-            if (name.isBlank()) return@Button
+    Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(name, { name = it }, label = { Text(t.name) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
+        PresenceButton(onClick = {
+            if (name.isBlank()) return@PresenceButton
             val body = project.body.toMutableMap()
             body["name"] = name.trim()
             app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
@@ -699,7 +717,7 @@ private fun ProjectDetail(
             }) { Text(t.clearGoal) }
         } else {
             Text(t.noGoal)
-            Button(onClick = { if (premium) goalOpen = true else onGate() }) { Text(t.setGoal) }
+            PresenceButton(onClick = { if (premium) goalOpen = true else onGate() }) { Text(t.setGoal) }
         }
         Text(t.ownTimer, style = MaterialTheme.typography.titleLarge)
         if (!premium) {
@@ -719,11 +737,11 @@ private fun ProjectDetail(
                 }) { Text(t.delete) }
             }
         }
-        Button(onClick = { if (premium) newTag = true else onGate() }) { Text(t.newTag) }
+        PresenceButton(onClick = { if (premium) newTag = true else onGate() }) { Text(t.newTag) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             tags.forEach { tag ->
                 val on = project.f("tags").split(",").contains(tag.id)
-                FilterChip(selected = on, onClick = {
+                PresenceChip(selected = on, onClick = {
                     if (!premium) onGate() else {
                         val set = project.f("tags").split(",").filter { it.isNotBlank() }.toMutableSet()
                         if (on) set.remove(tag.id) else set.add(tag.id)
@@ -737,9 +755,9 @@ private fun ProjectDetail(
         Text(t.tasks, style = MaterialTheme.typography.titleLarge)
         if (tags.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = taskFilter == null, onClick = { taskFilter = null }, label = { Text(t.all) })
+                PresenceChip(selected = taskFilter == null, onClick = { taskFilter = null }, label = { Text(t.all) })
                 tags.forEach { tag ->
-                    FilterChip(selected = taskFilter == tag.id, onClick = { taskFilter = if (taskFilter == tag.id) null else tag.id }, label = { Text(tag.f("name")) })
+                    PresenceChip(selected = taskFilter == tag.id, onClick = { taskFilter = if (taskFilter == tag.id) null else tag.id }, label = { Text(tag.f("name")) })
                 }
             }
         }
@@ -758,7 +776,7 @@ private fun ProjectDetail(
                 TextButton(onClick = { deleteTask = task }) { Text(t.delete) }
             }
         }
-        Button(onClick = { if (!premium && tasks.size >= FREE_TASKS) onGate() else newTask = true }) { Text(t.newTask) }
+        PresenceButton(onClick = { if (!premium && tasks.size >= FREE_TASKS) onGate() else newTask = true }) { Text(t.newTask) }
     }
     if (newTag) {
         NameDialog(t.newTag, "", t, { newTag = false }) { title ->
@@ -821,9 +839,9 @@ private fun OwnTimer(t: T, project: Rec, onSave: (Map<String, String>) -> Unit) 
         NumberRow(t.cycles, cycles) { cycles = it }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(t.countUp, modifier = Modifier.weight(1f))
-            Switch(checked = up, onCheckedChange = { up = it })
+            PresenceSwitch(checked = up, onCheckedChange = { up = it })
         }
-        Button(onClick = {
+        PresenceButton(onClick = {
             val body = project.body.toMutableMap()
             body["focus"] = focus
             body["short"] = short
@@ -837,7 +855,7 @@ private fun OwnTimer(t: T, project: Rec, onSave: (Map<String, String>) -> Unit) 
 
 @Composable
 private fun NumberRow(label: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(value, onChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(value, onChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
 }
 
 @Composable
@@ -975,7 +993,7 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
             listOf(t.today, t.week, t.month, t.year).forEachIndexed { index, label ->
-                FilterChip(selected = range == index, onClick = {
+                PresenceChip(selected = range == index, onClick = {
                     if (index > 0 && !premium) onGate() else range = index
                 }, label = { Text(label) })
             }
@@ -985,10 +1003,10 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             Text((slice.name.ifBlank { t.unlabeled }) + " · " + clockWords(slice.millis))
         }
         if (!premium) {
-            Surface(tonalElevation = 1.dp, shape = MaterialTheme.shapes.large) {
+            Surface(color = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shape = MaterialTheme.shapes.large) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(t.charts, style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = onGate) { Text(t.openSwitch) }
+                    PresenceButton(onClick = onGate) { Text(t.openSwitch) }
                 }
             }
         } else if (wide) {
@@ -1003,9 +1021,9 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it })
         }
         if (premium) {
-            Button(onClick = { share() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.share) }
+            PresenceButton(onClick = { share() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.share) }
             val logicalToday = today
-            Button(onClick = {
+            PresenceButton(onClick = {
                 if (selectedDay > logicalToday) note = t.future else manual = true
             }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.manual) }
         }
@@ -1101,14 +1119,14 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 projects.forEach { item ->
-                    FilterChip(selected = project == item.id, onClick = { project = item.id }, label = { Text(item.f("name")) })
+                    PresenceChip(selected = project == item.id, onClick = { project = item.id }, label = { Text(item.f("name")) })
                 }
-                Stepper(t.hours, hours, 0, 12) { hours = it }
-                Stepper(t.minutes, mins, 0, 59) { mins = it }
+                CountStepper(t.hours, hours, 0, 12) { hours = it }
+                CountStepper(t.minutes, mins, 0, 59) { mins = it }
                 Row {
-                    FilterChip(selected = kind == "focus", onClick = { kind = "focus" }, label = { Text(t.focus) })
+                    PresenceChip(selected = kind == "focus", onClick = { kind = "focus" }, label = { Text(t.focus) })
                     Spacer(Modifier.width(8.dp))
-                    FilterChip(selected = kind == "track", onClick = { kind = "track" }, label = { Text(t.track) })
+                    PresenceChip(selected = kind == "track", onClick = { kind = "track" }, label = { Text(t.track) })
                 }
             }
         },
@@ -1154,14 +1172,14 @@ private fun TodosPage(app: PresenceApp, t: T, rows: List<Rec>, wide: Boolean) {
     val editor: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(t.todos, style = MaterialTheme.typography.headlineMedium)
-            OutlinedTextField(
+            OutlinedTextField(colors = presenceFieldColors(), 
                 value = draft,
                 onValueChange = { draft = it },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(t.todoHint) },
                 singleLine = true,
             )
-            Button(
+            PresenceButton(
                 onClick = {
                     app.repo.addTodo(draft)
                     draft = ""
@@ -1202,7 +1220,7 @@ private fun TodosPage(app: PresenceApp, t: T, rows: List<Rec>, wide: Boolean) {
         }
     }
     if (wide) {
-        Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        Row(Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(Modifier.weight(1f)) { editor() }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { list() }
         }
@@ -1215,24 +1233,42 @@ private fun TodosPage(app: PresenceApp, t: T, rows: List<Rec>, wide: Boolean) {
 }
 
 @Composable
-private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    val ink = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+private fun ChoiceRow(title: String, help: String, selected: Boolean, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val background = if (selected) scheme.primaryContainer else scheme.surface
+    val ink = if (selected) scheme.onPrimaryContainer else scheme.onSurface
+    val helpInk = if (selected) scheme.onPrimaryContainer else scheme.onSurfaceVariant
     Surface(
         color = background,
+        contentColor = ink,
+        border = BorderStroke(1.dp, scheme.outline),
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
-        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = selected, onClick = onClick)
-            Text(label, color = ink, style = MaterialTheme.typography.titleMedium)
+        Row(
+            Modifier.padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(
+                selected = selected,
+                onClick = onClick,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = scheme.onPrimaryContainer,
+                    unselectedColor = scheme.outline,
+                ),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, color = ink, style = MaterialTheme.typography.titleMedium)
+                Text(help, color = helpInk, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }
 
 @Composable
 private fun ReminderRow(
-    label: String,
+    title: String,
+    help: String,
     on: Boolean,
     hour: Int,
     minute: Int,
@@ -1240,17 +1276,37 @@ private fun ReminderRow(
     onTime: (Int, Int) -> Unit,
 ) {
     val context = LocalContext.current
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        color = scheme.surface,
+        contentColor = scheme.onSurface,
+        border = BorderStroke(1.dp, scheme.outline),
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-                Switch(checked = on, onCheckedChange = onToggle)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, color = scheme.onSurface, style = MaterialTheme.typography.titleMedium)
+                    Text(help, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                }
+                PresenceSwitch(checked = on, onCheckedChange = onToggle)
             }
-            TextButton(
-                onClick = { TimePickerDialog(context, { _, h, m -> onTime(h, m) }, hour, minute, true).show() },
-                modifier = Modifier.heightIn(min = 48.dp),
+            Surface(
+                color = scheme.surface,
+                contentColor = scheme.onSurface,
+                border = BorderStroke(1.dp, scheme.outline),
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.clickable {
+                    TimePickerDialog(context, { _, h, m -> onTime(h, m) }, hour, minute, true).show()
+                },
             ) {
-                Text(String.format(Locale.ROOT, "%02d:%02d", hour, minute), style = MaterialTheme.typography.titleLarge)
+                Text(
+                    String.format(Locale.ROOT, "%02d:%02d", hour, minute),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    color = scheme.onSurface,
+                    style = MaterialTheme.typography.titleLarge,
+                )
             }
         }
     }
@@ -1305,97 +1361,137 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    val scroll = rememberScrollState()
-    val body: @Composable () -> Unit = {
-        Column(Modifier.verticalScroll(scroll).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(t.timerSettings, style = MaterialTheme.typography.titleLarge)
-            Stepper(t.focusLen, globals.focus, 1, 180) { app.repo.setPref("focus_min", it.toString()); app.center.refreshSettings() }
-            Stepper(t.shortLen, globals.short, 1, 60) { app.repo.setPref("short_min", it.toString()); app.center.refreshSettings() }
-            Stepper(t.longLen, globals.long, 1, 120) { app.repo.setPref("long_min", it.toString()); app.center.refreshSettings() }
-            Stepper(t.cycles, globals.cycles, 1, 12) { app.repo.setPref("cycles", it.toString()); app.center.refreshSettings() }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (globals.countUp) t.countUp else t.countDown, modifier = Modifier.weight(1f))
-                Switch(checked = globals.countUp, onCheckedChange = { app.repo.setPref("count_up", if (it) "1" else "0"); app.center.refreshSettings() })
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(t.autoContinue, modifier = Modifier.weight(1f))
-                Switch(checked = globals.auto, onCheckedChange = { app.repo.setPref("auto_start", if (it) "1" else "0"); app.center.refreshSettings() })
-            }
-            Stepper(t.dayStarts, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
-            Text(t.reminders, style = MaterialTheme.typography.titleLarge)
-            ReminderRow(t.dailyReminder, globals.dailyOn, globals.dailyHour, globals.dailyMinute, { on ->
-                if (on) askNotify()
-                app.repo.setPref("daily_on", if (on) "1" else "0")
-                Reminders.reschedule(context)
-            }) { hour, minute ->
-                app.repo.setPref("daily_hour", hour.toString())
-                app.repo.setPref("daily_minute", minute.toString())
-                Reminders.reschedule(context)
-            }
-            ReminderRow(t.streakReminder, globals.streakOn, globals.streakHour, globals.streakMinute, { on ->
-                if (on) askNotify()
-                app.repo.setPref("streak_on", if (on) "1" else "0")
-                Reminders.reschedule(context)
-            }) { hour, minute ->
-                app.repo.setPref("streak_hour", hour.toString())
-                app.repo.setPref("streak_minute", minute.toString())
-                Reminders.reschedule(context)
-            }
-            Text(t.appearance, style = MaterialTheme.typography.titleLarge)
-            ChoiceRow(t.followSystem, (flags["theme"] ?: "system") == "system") { app.repo.updateFlags { it["theme"] = "system" } }
-            ChoiceRow(t.light, flags["theme"] == "light") { app.repo.updateFlags { it["theme"] = "light" } }
-            ChoiceRow(t.dark, flags["theme"] == "dark") { app.repo.updateFlags { it["theme"] = "dark" } }
-            Text(t.textSize)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("compact" to t.compact, "standard" to t.standard, "large" to t.large).forEach { (id, label) ->
-                    FilterChip(selected = (flags["text"] ?: "standard") == id, onClick = { app.repo.updateFlags { it["text"] = id } }, label = { Text(label) })
-                }
-            }
-            Text(t.language)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("system", "en", "tr", "es", "pt", "fr", "ja", "ko").forEach { id ->
-                    FilterChip(selected = (flags["language"] ?: "system") == id, onClick = { app.repo.updateFlags { it["language"] = id } }, label = { Text(id) })
-                }
-            }
-            Text(t.sounds, style = MaterialTheme.typography.titleLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("chime" to t.chime, "bell" to t.bell, "pulse" to t.pulse, "custom" to t.custom).forEach { (id, label) ->
-                    FilterChip(selected = globals.alarm == id, onClick = {
-                        if (id == "custom") sound.launch(arrayOf("audio/*")) else app.repo.setPref("alarm", id)
-                    }, label = { Text(label) })
-                }
-            }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("off" to t.off, "rain" to t.rain, "brook" to t.brook, "hearth" to t.hearth).forEach { (id, label) ->
-                    FilterChip(selected = globals.background == id, onClick = {
-                        app.repo.setPref("background", id)
-                    }, label = { Text(label) })
-                }
-            }
-            Stepper(t.volume, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()) }
-            Text(t.data, style = MaterialTheme.typography.titleLarge)
-            Button(onClick = { exportJson.launch("presence-backup.json") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportJson) }
-            Button(onClick = { exportCsv.launch("presence-sessions.csv") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportCsv) }
-            Button(onClick = { importJson.launch(arrayOf("application/json", "text/*", "*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(t.importJson) }
-            if (note.isNotEmpty()) Text(note)
-            Text(t.devices, style = MaterialTheme.typography.titleLarge)
-            Button(onClick = onPair, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pair) }
-            Text(t.about, style = MaterialTheme.typography.titleLarge)
-            Text(t.aboutBody)
+    val theme = flags["theme"] ?: "system"
+    val textSize = flags["text"] ?: "standard"
+    val language = flags["language"] ?: "system"
+    val timerPane: @Composable () -> Unit = {
+        Text(t.timerSettings, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        Stepper(t.focusLen, t.focusHelp, globals.focus, 1, 180) { app.repo.setPref("focus_min", it.toString()); app.center.refreshSettings() }
+        Stepper(t.shortLen, t.shortHelp, globals.short, 1, 60) { app.repo.setPref("short_min", it.toString()); app.center.refreshSettings() }
+        Stepper(t.longLen, t.longHelp, globals.long, 1, 120) { app.repo.setPref("long_min", it.toString()); app.center.refreshSettings() }
+        Stepper(t.cycles, t.cyclesHelp, globals.cycles, 1, 12) { app.repo.setPref("cycles", it.toString()); app.center.refreshSettings() }
+        SwitchSetting(t.countUp, t.countUpHelp, globals.countUp) { app.repo.setPref("count_up", if (it) "1" else "0"); app.center.refreshSettings() }
+        SwitchSetting(t.autoContinue, t.autoHelp, globals.auto) { app.repo.setPref("auto_start", if (it) "1" else "0"); app.center.refreshSettings() }
+        Stepper(t.dayStarts, t.dayHelp, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
+        Text(t.reminders, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        ReminderRow(t.dailyReminder, t.dailyHelp, globals.dailyOn, globals.dailyHour, globals.dailyMinute, { on ->
+            if (on) askNotify()
+            app.repo.setPref("daily_on", if (on) "1" else "0")
+            Reminders.reschedule(context)
+        }) { hour, minute ->
+            app.repo.setPref("daily_hour", hour.toString())
+            app.repo.setPref("daily_minute", minute.toString())
+            Reminders.reschedule(context)
         }
+        ReminderRow(t.streakReminder, t.streakHelp, globals.streakOn, globals.streakHour, globals.streakMinute, { on ->
+            if (on) askNotify()
+            app.repo.setPref("streak_on", if (on) "1" else "0")
+            Reminders.reschedule(context)
+        }) { hour, minute ->
+            app.repo.setPref("streak_hour", hour.toString())
+            app.repo.setPref("streak_minute", minute.toString())
+            Reminders.reschedule(context)
+        }
+    }
+    val otherPane: @Composable () -> Unit = {
+        Text(t.appearance, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        ChoiceRow(t.light, t.lightHelp, theme == "light") { app.repo.updateFlags { it["theme"] = "light" } }
+        ChoiceRow(t.dark, t.darkHelp, theme == "dark") { app.repo.updateFlags { it["theme"] = "dark" } }
+        ChoiceRow(t.followSystem, t.followHelp, theme == "system") { app.repo.updateFlags { it["theme"] = "system" } }
+        Text(t.textSize, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        ChoiceRow(t.compact, t.compactHelp, textSize == "compact") { app.repo.updateFlags { it["text"] = "compact" } }
+        ChoiceRow(t.standard, t.standardHelp, textSize == "standard") { app.repo.updateFlags { it["text"] = "standard" } }
+        ChoiceRow(t.large, t.largeHelp, textSize == "large") { app.repo.updateFlags { it["text"] = "large" } }
+        Text(t.language, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        listOf(
+            "system" to (t.system to t.langSystemHelp),
+            "en" to (t.langEnglish to t.langEnHelp),
+            "tr" to (t.langTurkish to t.langTrHelp),
+            "es" to (t.langSpanish to t.langEsHelp),
+            "pt" to (t.langPortuguese to t.langPtHelp),
+            "fr" to (t.langFrench to t.langFrHelp),
+            "ja" to (t.langJapanese to t.langJaHelp),
+            "ko" to (t.langKorean to t.langKoHelp),
+        ).forEach { (id, copy) ->
+            ChoiceRow(copy.first, copy.second, language == id) { app.repo.updateFlags { it["language"] = id } }
+        }
+        Text(t.sounds, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        Text(t.alarm, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+        ChoiceRow(t.chime, t.chimeHelp, globals.alarm == "chime") { app.repo.setPref("alarm", "chime") }
+        ChoiceRow(t.bell, t.bellHelp, globals.alarm == "bell") { app.repo.setPref("alarm", "bell") }
+        ChoiceRow(t.pulse, t.pulseHelp, globals.alarm == "pulse") { app.repo.setPref("alarm", "pulse") }
+        ChoiceRow(t.custom, t.customHelp, globals.alarm == "custom") { sound.launch(arrayOf("audio/*")) }
+        Text(t.background, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+        ChoiceRow(t.off, t.offHelp, globals.background == "off") { app.repo.setPref("background", "off") }
+        ChoiceRow(t.rain, t.rainHelp, globals.background == "rain") { app.repo.setPref("background", "rain") }
+        ChoiceRow(t.brook, t.brookHelp, globals.background == "brook") { app.repo.setPref("background", "brook") }
+        ChoiceRow(t.hearth, t.hearthHelp, globals.background == "hearth") { app.repo.setPref("background", "hearth") }
+        Stepper(t.volume, t.volumeHelp, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()) }
+        Text(t.data, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        Setting(t.exportJson, t.exportJsonHelp) {
+            PresenceButton(onClick = { exportJson.launch("presence-backup.json") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportJson) }
+        }
+        Setting(t.exportCsv, t.exportCsvHelp) {
+            PresenceButton(onClick = { exportCsv.launch("presence-sessions.csv") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportCsv) }
+        }
+        Setting(t.importJson, t.importHelp) {
+            PresenceButton(onClick = { importJson.launch(arrayOf("application/json", "text/*", "*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(t.importJson) }
+        }
+        if (note.isNotEmpty()) Text(note, color = MaterialTheme.colorScheme.onSurface)
+        Text(t.devices, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        Setting(t.pair, t.pairHelp) {
+            PresenceButton(onClick = onPair, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pair) }
+        }
+        Text(t.about, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        Text(t.aboutBody, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
     }
     if (wide) {
         Row(Modifier.fillMaxSize()) {
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp)) {
-                Text(t.timerSettings, style = MaterialTheme.typography.headlineMedium)
-                Text(t.aboutBody)
-            }
-            Box(Modifier.weight(1f)) { body() }
+            Column(
+                Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) { timerPane() }
+            Column(
+                Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) { otherPane() }
         }
     } else {
-        body()
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            timerPane()
+            otherPane()
+        }
     }
 }
+
+@Composable
+private fun Setting(title: String, help: String, control: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(help, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(8.dp))
+        control()
+    }
+}
+
+@Composable
+private fun SwitchSetting(title: String, help: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(help, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.width(16.dp))
+        PresenceSwitch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+
 
 @Composable
 private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
@@ -1431,9 +1527,9 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
     }
     val leftMs = (until - System.currentTimeMillis()).coerceAtLeast(0)
     val peers = rows.filter { it.kind == KIND_LOCAL && it.id.startsWith("peer:") && !it.deleted && it.f("token").isNotEmpty() }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (now < 0) return@Column
-        Button(onClick = { withLink { app.lan.showCode() } }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(t.showCode) }
+        PresenceButton(onClick = { withLink { app.lan.showCode() } }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(t.showCode) }
         if (offer != null) {
             Text(offer!!, style = MaterialTheme.typography.displayLarge, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             Text(t.expiresIn(clockDigits(leftMs)), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
@@ -1441,11 +1537,11 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
             TextButton(onClick = { app.lan.hideCode() }) { Text(t.cancel) }
         } else if (message == "expired") {
             Text(t.expired)
-            Button(onClick = { withLink { app.lan.showCode() } }) { Text(t.newCode) }
+            PresenceButton(onClick = { withLink { app.lan.showCode() } }) { Text(t.newCode) }
         }
         Text(t.enterHelp)
-        OutlinedTextField(digits, { if (it.length <= 4 && it.all { ch -> ch.isDigit() }) digits = it }, label = { Text(t.enterCode) }, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { withLink { app.lan.enter(digits) } }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pairAction) }
+        OutlinedTextField(digits, { if (it.length <= 4 && it.all { ch -> ch.isDigit() }) digits = it }, label = { Text(t.enterCode) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
+        PresenceButton(onClick = { withLink { app.lan.enter(digits) } }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pairAction) }
         if (message.isNotEmpty() && message != "expired") Text(t.pairMessage(message))
         Text(t.devices, style = MaterialTheme.typography.titleLarge)
         if (peers.isEmpty()) Text(t.noPeers)
@@ -1465,13 +1561,97 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
 }
 
 @Composable
-private fun Stepper(label: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f))
-        FilledTonalButton(onClick = { if (value > min) onChange(value - 1) }, enabled = value > min, modifier = Modifier.size(48.dp)) { Text("–") }
-        Text(value.toString(), modifier = Modifier.widthIn(min = 36.dp), textAlign = TextAlign.Center)
-        FilledTonalButton(onClick = { if (value < max) onChange(value + 1) }, enabled = value < max, modifier = Modifier.size(48.dp)) { Text("+") }
+private fun Stepper(title: String, help: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(help, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TonalButton(onClick = { if (value > min) onChange(value - 1) }, enabled = value > min, modifier = Modifier.size(48.dp)) { Text("–") }
+            Text(
+                value.toString(),
+                modifier = Modifier.widthIn(min = 36.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleLarge,
+            )
+            TonalButton(onClick = { if (value < max) onChange(value + 1) }, enabled = value < max, modifier = Modifier.size(48.dp)) { Text("+") }
+        }
     }
+}
+
+@Composable
+private fun CountStepper(label: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+        TonalButton(onClick = { if (value > min) onChange(value - 1) }, enabled = value > min, modifier = Modifier.size(48.dp)) { Text("–") }
+        Text(
+            value.toString(),
+            modifier = Modifier.widthIn(min = 36.dp),
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        TonalButton(onClick = { if (value < max) onChange(value + 1) }, enabled = value < max, modifier = Modifier.size(48.dp)) { Text("+") }
+    }
+}
+
+
+@Composable
+private fun PresenceButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        colors = presenceButtonColors(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        content = content,
+    )
+}
+
+@Composable
+private fun TonalButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        colors = presenceTonalColors(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        content = content,
+    )
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun PresenceChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        modifier = modifier,
+        colors = presenceChipColors(),
+        border = presenceChipBorder(enabled = true, selected = selected),
+    )
+}
+
+@Composable
+private fun PresenceSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Switch(checked = checked, onCheckedChange = onCheckedChange, colors = presenceSwitchColors())
 }
 
 @Composable
@@ -1494,7 +1674,7 @@ private fun NameDialog(title: String, initial: String, t: T, onClose: () -> Unit
         title = { Text(title) },
         text = {
             Column {
-                OutlinedTextField(name, { name = it; error = false }, label = { Text(t.name) })
+                OutlinedTextField(name, { name = it; error = false }, label = { Text(t.name) }, colors = presenceFieldColors())
                 if (error) Text(t.giveName)
             }
         },
@@ -1521,7 +1701,7 @@ private fun ProjectDialog(
         title = { Text(t.newProject) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it; error = false }, label = { Text(t.name) })
+                OutlinedTextField(name, { name = it; error = false }, label = { Text(t.name) }, colors = presenceFieldColors())
                 if (error) Text(t.giveName)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Swatches.forEach { swatch ->
@@ -1533,7 +1713,7 @@ private fun ProjectDialog(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     groups.forEach { item ->
-                        FilterChip(selected = group == item.id, onClick = { group = item.id }, label = { Text(item.f("name")) })
+                        PresenceChip(selected = group == item.id, onClick = { group = item.id }, label = { Text(item.f("name")) })
                     }
                 }
             }
@@ -1556,8 +1736,8 @@ private fun GoalDialog(t: T, onClose: () -> Unit, onSave: (Int, Long) -> Unit) {
         title = { Text(t.setGoal) },
         text = {
             Column {
-                Stepper(t.hours, hours, 0, 10000) { hours = it }
-                Stepper(t.minutes, mins, 0, 59) { mins = it }
+                CountStepper(t.hours, hours, 0, 10000) { hours = it }
+                CountStepper(t.minutes, mins, 0, 59) { mins = it }
                 TextButton(onClick = {
                     DatePickerDialog(context, { _, y, m, d -> deadline = LocalDate.of(y, m + 1, d) }, deadline.year, deadline.monthValue - 1, deadline.dayOfMonth).show()
                 }) { Text(t.deadline + " · " + deadline) }
