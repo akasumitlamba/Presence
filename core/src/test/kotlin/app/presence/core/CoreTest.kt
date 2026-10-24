@@ -136,9 +136,9 @@ class CoreTest {
         val armed = arm(Snap(focusMin = 25, cycles = 4), "focus", 1_000, 1_000, hint)
         val later = pauseSnap(armed.snap, 1_000 + 1_000, 1_000 + 1_000)
         assertEquals("paused", later.snap.status)
-        assertEquals(25 * 60_000L - 1_000, timeLeft(later.snap, 1_000 + 1_000, 1_000 + 1_000))
+        assertEquals(armed.snap.phaseMillis - 1_000, timeLeft(later.snap, 1_000 + 1_000, 1_000 + 1_000))
         val resumed = resumeSnap(later.snap, 1_000 + 2_000, 1_000 + 2_000, "tok2")
-        assertEquals(25 * 60_000L - 1_000, timeLeft(resumed.snap, 1_000 + 2_000, 1_000 + 2_000))
+        assertEquals(armed.snap.phaseMillis - 1_000, timeLeft(resumed.snap, 1_000 + 2_000, 1_000 + 2_000))
         val stopped = finishSnap(resumed.snap, 1_000 + 2_400, 1_000 + 2_400, "stop", "n", "t")
         assertEquals("idle", stopped.snap.status)
         assertEquals(0, stopped.snap.focusDone)
@@ -146,21 +146,91 @@ class CoreTest {
     }
 
     @Test
-    fun skipCountsAndAFullPhaseCanAutoContinue() {
+    fun durationSplitsByBreakCountsNotByAFixedHour() {
+        assertEquals(3, stretchCount(2, 0))
+        assertEquals(3, stretchCount(1, 1))
+        assertEquals(1, stretchCount(0, 0))
+        assertEquals(listOf(1_200_000L, 1_200_000L, 1_200_000L), stretchLengths(60 * 60_000L, stretchCount(2, 0)))
+        assertEquals(listOf(500_000L, 500_000L, 500_000L), stretchLengths(25 * 60_000L, stretchCount(2, 0)))
+        assertEquals(listOf(2_400_000L, 2_400_000L, 2_400_000L), stretchLengths(2 * 60 * 60_000L, stretchCount(2, 0)))
+        val odd = stretchLengths(1_000L, 3)
+        assertEquals(listOf(334L, 333L, 333L), odd)
+        assertEquals(1_000L, odd.sum())
+        assertEquals(listOf("short", "short"), breakKinds(2, 0))
+        assertEquals(emptyList<String>(), breakKinds(0, 0))
+        assertEquals(listOf("long", "short"), breakKinds(1, 1))
+        assertEquals(listOf("short", "long", "short", "short"), breakKinds(3, 1))
+        assertEquals(listOf("long", "short", "short", "long"), breakKinds(2, 2))
+        assertNotEquals(breakKinds(3, 1).last(), "long")
         val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
-        val armed = arm(Snap(focusMin = 1, cycles = 4, autoStart = false), "focus", 0, 0, hint)
-        val end = armed.snap.alarmAtEpoch
-        val done = finishSnap(armed.snap, end, end, "due", "next", "tok2")
-        assertTrue(done.chime)
-        assertEquals("awaiting", done.snap.status)
-        assertEquals("short", done.snap.awaitingKind)
-        assertEquals(1, done.snap.focusDone)
-        assertFalse(done.writes.single().deleted)
-        val auto = arm(Snap(focusMin = 1, cycles = 4, autoStart = true), "focus", 0, 0, hint)
-        val jumped = finishSnap(auto.snap, auto.snap.alarmAtEpoch, auto.snap.alarmAtElapsed, "due", "next", "tok3")
-        assertEquals("running", jumped.snap.status)
-        assertEquals("short", jumped.snap.kind)
-        assertEquals(2, jumped.writes.size)
+        val quarter = Snap(workMillis = 25 * 60_000L, shortCount = 2, longCount = 0, shortMillis = 60_000L, longMillis = 60_000L)
+        val twoHours = quarter.copy(workMillis = 2 * 60 * 60_000L)
+        assertEquals(500_000L, arm(quarter, "focus", 0, 0, hint).snap.phaseMillis)
+        assertEquals(2_400_000L, arm(twoHours, "focus", 0, 0, hint.copy(sessionId = "other")).snap.phaseMillis)
+    }
+
+    @Test
+    fun stretchEndStartsTheBreakAndTheNextStretchWaits() {
+        val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
+        val plan = Snap(workMillis = 25 * 60_000L, shortCount = 2, longCount = 0, shortMillis = 60_000L, longMillis = 15 * 60_000L, autoStart = true)
+        val first = arm(plan, "focus", 0, 0, hint)
+        val afterStretch = finishSnap(first.snap, first.snap.alarmAtEpoch, first.snap.alarmAtElapsed, "due", "break", "tok2")
+        assertTrue(afterStretch.chime)
+        assertEquals("running", afterStretch.snap.status)
+        assertEquals("short", afterStretch.snap.kind)
+        assertEquals(60_000L, afterStretch.snap.phaseMillis)
+        assertEquals(2, afterStretch.writes.size)
+        assertFalse(afterStretch.writes.first().deleted)
+        val afterBreak = finishSnap(afterStretch.snap, afterStretch.snap.alarmAtEpoch, afterStretch.snap.alarmAtElapsed, "due", "next", "tok3")
+        assertEquals("awaiting", afterBreak.snap.status)
+        assertEquals("focus", afterBreak.snap.kind)
+        assertEquals("focus", afterBreak.snap.awaitingKind)
+        assertEquals(500_000L, afterBreak.snap.phaseMillis)
+        assertEquals(1, afterBreak.writes.size)
+        val played = arm(afterBreak.snap, "focus", afterBreak.snap.phaseMillis, afterBreak.snap.phaseMillis, hint.copy(sessionId = "s2", token = "tok4"))
+        assertEquals("running", played.snap.status)
+        assertEquals("focus", played.snap.kind)
+        assertEquals(500_000L, played.snap.phaseMillis)
+    }
+
+    @Test
+    fun pausedTimeIsNotWorkAndNotABreak() {
+        val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
+        val plan = Snap(workMillis = 60_000L, shortCount = 0, longCount = 0, shortMillis = 30_000L, longMillis = 30_000L)
+        val armed = arm(plan, "focus", 0, 0, hint)
+        val paused = pauseSnap(armed.snap, 10_000, 10_000)
+        assertEquals(1, paused.snap.pauseCount)
+        assertTrue(paused.writes.isEmpty())
+        assertEquals("focus", paused.snap.kind)
+        val resumed = resumeSnap(paused.snap, 40_000, 40_000, "tok2")
+        assertEquals(30_000L, resumed.snap.pauseTotalMs)
+        assertTrue(resumed.writes.isEmpty())
+        val end = resumed.snap.alarmAtEpoch
+        val elapsedEnd = resumed.snap.alarmAtElapsed
+        val done = finishSnap(resumed.snap, end, elapsedEnd, "due", "n", "t")
+        assertEquals("idle", done.snap.status)
+        assertEquals(0, done.snap.pauseCount)
+        assertEquals(0L, done.snap.pauseTotalMs)
+        val closed = done.writes.single()
+        assertEquals("focus", closed.f("kind"))
+        assertEquals("30000", closed.f("pausedMs"))
+        assertEquals(60_000L, sessionCountedMillis(closed))
+        assertTrue(done.writes.none { it.f("kind") == "pause" || it.f("kind") == "short" || it.f("kind") == "long" })
+        val zone = ZoneId.of("UTC")
+        assertEquals(60_000L, slicesFor(done.writes, LocalDate.of(1970, 1, 1), LocalDate.of(1970, 1, 2), zone, 0).sumOf { it.millis })
+
+        val restHint = hint.copy(sessionId = "rest", token = "tr")
+        val resting = arm(plan.copy(shortCount = 1, longCount = 0, stretchIndex = 1), "short", 0, 0, restHint)
+        val restPaused = pauseSnap(resting.snap, 5_000, 5_000)
+        val restResumed = resumeSnap(restPaused.snap, 15_000, 15_000, "tr2")
+        val restEnd = restResumed.snap.alarmAtEpoch
+        val restDone = finishSnap(restResumed.snap, restEnd, restResumed.snap.alarmAtElapsed, "due", "n2", "t2")
+        val restClosed = restDone.writes.first()
+        assertEquals("short", restClosed.f("kind"))
+        assertEquals(0L, sessionCountedMillis(restClosed))
+        assertTrue(restClosed.f("pausedMs").toLong() >= 10_000L)
+        assertTrue(restDone.writes.none { it.f("kind") == "pause" })
+        assertEquals(0L, slicesFor(listOf(restClosed), LocalDate.of(1970, 1, 1), LocalDate.of(1970, 1, 2), zone, 0).sumOf { it.millis })
     }
 
     @Test
@@ -213,7 +283,7 @@ class CoreTest {
     @Test
     fun rebootUsesTheWallClock() {
         val hint = StartHint(null, "", "", null, "", "phone", "sess", "tok")
-        val armed = arm(Snap(focusMin = 25), "focus", 5_000, 5_000, hint)
+        val armed = arm(Snap(workMillis = 25 * 60_000L, shortCount = 0, longCount = 0), "focus", 5_000, 5_000, hint)
         val left = timeLeft(armed.snap, 5_000 + 10_000, 80)
         assertEquals(25 * 60_000L - 10_000, left)
         assertTrue(due(armed.snap, armed.snap.alarmAtEpoch + 5, 10))

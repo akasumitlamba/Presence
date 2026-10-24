@@ -60,7 +60,7 @@ class Notifier(private val context: Context) {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-        if (snap.status == "running" && snap.kind != "track" && !snap.countUp) {
+        if (snap.status == "running" && snap.kind != "track") {
             builder.setWhen(snap.alarmAtEpoch)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(true)
@@ -77,7 +77,7 @@ class Notifier(private val context: Context) {
         if (snap.status == "running") {
             builder.addAction(0, t.pause, serviceIntent(TimerService.PAUSE))
         } else if (snap.status == "paused") {
-            builder.addAction(0, t.resume, serviceIntent(TimerService.RESUME))
+            builder.addAction(0, t.play, serviceIntent(TimerService.RESUME))
         }
         builder.addAction(0, t.stop, serviceIntent(TimerService.STOP))
         return builder.build()
@@ -94,7 +94,7 @@ class Notifier(private val context: Context) {
             .setContentIntent(openIntent())
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .addAction(0, t.startNext, serviceIntent(TimerService.NEXT))
+            .addAction(0, t.play, serviceIntent(TimerService.NEXT))
             .addAction(0, t.dismiss, dismissIntent())
         manager.notify(DONE_ID, builder.build())
     }

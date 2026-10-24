@@ -12,6 +12,8 @@ import app.presence.R
 import app.presence.core.clockDigits
 import app.presence.core.displayMillis
 import app.presence.core.elapsedWork
+import app.presence.core.stretchCount
+import app.presence.core.stretchLengths
 import app.presence.timer.TimerService
 
 class PresenceWidget : AppWidgetProvider() {
@@ -41,11 +43,10 @@ class PresenceWidget : AppWidgetProvider() {
                 "track" -> t.track
                 else -> t.focus
             }
-            val (action, label) = when (snap.status) {
-                "running" -> TimerService.PAUSE to t.pause
-                "paused" -> TimerService.RESUME to t.resume
-                "awaiting" -> TimerService.NEXT to t.startNext
-                else -> TimerService.START to t.start
+            val (action, label) = if (snap.status == "running") {
+                TimerService.PAUSE to t.pause
+            } else {
+                TimerService.START to t.play
             }
             views.setTextViewText(R.id.widget_kicker, if (snap.status == "idle") t.focus else phase)
             views.setTextViewText(R.id.widget_sub, snap.projectName.ifBlank { t.unlabeled })
@@ -53,7 +54,7 @@ class PresenceWidget : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_action, serviceClick(context, action))
             val nowE = System.currentTimeMillis()
             val nowL = SystemClock.elapsedRealtime()
-            if (snap.status == "running" && snap.kind != "track" && !snap.countUp) {
+            if (snap.status == "running" && snap.kind != "track") {
                 views.setViewVisibility(R.id.widget_plain, View.GONE)
                 views.setViewVisibility(R.id.widget_time, View.VISIBLE)
                 views.setChronometer(R.id.widget_time, SystemClock.elapsedRealtime() + displayMillis(snap, nowE, nowL), null, true)
@@ -66,7 +67,9 @@ class PresenceWidget : AppWidgetProvider() {
             } else {
                 views.setViewVisibility(R.id.widget_time, View.GONE)
                 views.setViewVisibility(R.id.widget_plain, View.VISIBLE)
-                val shown = if (snap.status == "idle") app.repo.globals().focus * 60_000L else displayMillis(snap, nowE, nowL)
+                val globals = app.repo.globals()
+                val idle = stretchLengths(globals.workMillis, stretchCount(globals.shortCount, globals.longCount)).first()
+                val shown = if (snap.status == "idle") idle else displayMillis(snap, nowE, nowL)
                 views.setTextViewText(R.id.widget_plain, clockDigits(shown))
             }
             return views

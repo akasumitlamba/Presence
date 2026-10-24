@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.round
 
 fun dayKey(epochMs: Long, zone: ZoneId, dayStartHour: Int): LocalDate {
     val shift = dayStartHour.coerceIn(0, 6).toLong()
@@ -122,6 +123,44 @@ fun clockWords(ms: Long): String {
     return if (h <= 0) "${m}m" else "${h}h ${m.toString().padStart(2, '0')}m"
 }
 
+fun stretchCount(shortBreaks: Int, longBreaks: Int): Int =
+    shortBreaks.coerceAtLeast(0) + longBreaks.coerceAtLeast(0) + 1
+
+fun stretchLengths(durationMs: Long, stretches: Int): List<Long> {
+    val count = stretches.coerceAtLeast(1)
+    val total = durationMs.coerceAtLeast(0L)
+    val base = total / count
+    val extra = (total % count).toInt()
+    return List(count) { index -> base + if (index < extra) 1L else 0L }
+}
+
+fun breakKinds(shortBreaks: Int, longBreaks: Int): List<String> {
+    val gaps = shortBreaks.coerceAtLeast(0) + longBreaks.coerceAtLeast(0)
+    if (gaps == 0) return emptyList()
+    val longs = longBreaks.coerceIn(0, gaps)
+    if (longs == 0) return List(gaps) { "short" }
+    if (longs == gaps) return List(gaps) { "long" }
+    val marks = BooleanArray(gaps)
+    if (longs == 1) {
+        marks[(gaps - 1) / 2] = true
+    } else {
+        for (slot in 0 until longs) {
+            val at = round(slot.toDouble() * (gaps - 1) / (longs - 1)).toInt().coerceIn(0, gaps - 1)
+            marks[at] = true
+        }
+    }
+    var placed = marks.count { it }
+    var cursor = 0
+    while (placed < longs && cursor < gaps) {
+        if (!marks[cursor]) {
+            marks[cursor] = true
+            placed += 1
+        }
+        cursor += 1
+    }
+    return List(gaps) { if (marks[it]) "long" else "short" }
+}
+
 fun clockDigits(ms: Long): String {
     val safe = ms.coerceAtLeast(0) / 1000L
     val h = safe / 3600
@@ -160,6 +199,15 @@ data class Snap(
     val completionToken: String = "",
     val awaitingKind: String = "",
     val writerId: String = "",
+    val workMillis: Long = DEFAULT_WORK_MS,
+    val shortCount: Int = DEFAULT_SHORT_BREAKS,
+    val longCount: Int = DEFAULT_LONG_BREAKS,
+    val shortMillis: Long = DEFAULT_SHORT_MS,
+    val longMillis: Long = DEFAULT_LONG_MS,
+    val stretchIndex: Int = 0,
+    val pauseCount: Int = 0,
+    val pauseTotalMs: Long = 0,
+    val pauseStartedEpoch: Long = 0,
 )
 
 fun Snap.toFields(): Map<String, String> = mapOf(
@@ -188,6 +236,15 @@ fun Snap.toFields(): Map<String, String> = mapOf(
     "completionToken" to completionToken,
     "awaitingKind" to awaitingKind,
     "writerId" to writerId,
+    "workMillis" to workMillis.toString(),
+    "shortCount" to shortCount.toString(),
+    "longCount" to longCount.toString(),
+    "shortMillis" to shortMillis.toString(),
+    "longMillis" to longMillis.toString(),
+    "stretchIndex" to stretchIndex.toString(),
+    "pauseCount" to pauseCount.toString(),
+    "pauseTotalMs" to pauseTotalMs.toString(),
+    "pauseStartedEpoch" to pauseStartedEpoch.toString(),
 )
 
 fun snapFrom(fields: Map<String, String>): Snap = Snap(
@@ -216,6 +273,15 @@ fun snapFrom(fields: Map<String, String>): Snap = Snap(
     completionToken = fields["completionToken"].orEmpty(),
     awaitingKind = fields["awaitingKind"].orEmpty(),
     writerId = fields["writerId"].orEmpty(),
+    workMillis = fields["workMillis"]?.toLongOrNull() ?: DEFAULT_WORK_MS,
+    shortCount = fields["shortCount"]?.toIntOrNull() ?: DEFAULT_SHORT_BREAKS,
+    longCount = fields["longCount"]?.toIntOrNull() ?: DEFAULT_LONG_BREAKS,
+    shortMillis = fields["shortMillis"]?.toLongOrNull() ?: DEFAULT_SHORT_MS,
+    longMillis = fields["longMillis"]?.toLongOrNull() ?: DEFAULT_LONG_MS,
+    stretchIndex = fields["stretchIndex"]?.toIntOrNull() ?: 0,
+    pauseCount = fields["pauseCount"]?.toIntOrNull() ?: 0,
+    pauseTotalMs = fields["pauseTotalMs"]?.toLongOrNull() ?: 0L,
+    pauseStartedEpoch = fields["pauseStartedEpoch"]?.toLongOrNull() ?: 0L,
 )
 
 fun skewLarge(nowEpoch: Long, nowElapsed: Long, anchorEpoch: Long, anchorElapsed: Long): Boolean {
@@ -248,16 +314,20 @@ fun elapsedWork(snap: Snap, nowEpoch: Long, nowElapsed: Long): Long {
 
 fun displayMillis(snap: Snap, nowEpoch: Long, nowElapsed: Long): Long {
     if (snap.kind == "track") return elapsedWork(snap, nowEpoch, nowElapsed)
-    if (snap.countUp) {
-        val done = if (snap.status == "running" || snap.status == "paused") {
-            elapsedWork(snap, nowEpoch, nowElapsed)
-        } else {
-            0L
-        }
-        return done.coerceAtMost(snap.phaseMillis)
-    }
     return timeLeft(snap, nowEpoch, nowElapsed)
 }
+
+fun pauseNoteMillis(snap: Snap, nowEpoch: Long): Long {
+    val live = if (snap.status == "paused" && snap.pauseStartedEpoch > 0L) {
+        (nowEpoch - snap.pauseStartedEpoch).coerceAtLeast(0L)
+    } else {
+        0L
+    }
+    return (snap.pauseTotalMs + live).coerceAtLeast(0L)
+}
+
+fun sessionOpen(snap: Snap): Boolean =
+    snap.status == "running" || snap.status == "paused" || snap.status == "awaiting"
 
 fun due(snap: Snap, nowEpoch: Long, nowElapsed: Long): Boolean {
     if (snap.status != "running" || snap.kind == "track") return false
@@ -283,10 +353,52 @@ data class Step(
 )
 
 private fun phaseLength(snap: Snap, kind: String): Long = when (kind) {
-    "short" -> snap.shortMin.coerceAtLeast(1) * 60_000L
-    "long" -> snap.longMin.coerceAtLeast(1) * 60_000L
+    "short" -> snap.shortMillis.coerceAtLeast(1_000L)
+    "long" -> snap.longMillis.coerceAtLeast(1_000L)
     "track" -> 0L
-    else -> snap.focusMin.coerceAtLeast(1) * 60_000L
+    else -> {
+        val count = stretchCount(snap.shortCount, snap.longCount)
+        val lengths = stretchLengths(snap.workMillis, count)
+        lengths[snap.stretchIndex.coerceIn(0, lengths.lastIndex)]
+    }
+}
+
+private fun hintOf(snap: Snap, sessionId: String, token: String) = StartHint(
+    snap.projectId,
+    snap.projectName,
+    snap.groupName,
+    snap.taskId,
+    snap.taskTitle,
+    snap.writerId,
+    sessionId,
+    token,
+)
+
+private fun foldPause(snap: Snap, nowEpoch: Long): Snap {
+    if (snap.status != "paused" || snap.pauseStartedEpoch <= 0L) return snap.copy(pauseStartedEpoch = 0)
+    val added = (nowEpoch - snap.pauseStartedEpoch).coerceAtLeast(0L)
+    return snap.copy(pauseTotalMs = snap.pauseTotalMs + added, pauseStartedEpoch = 0)
+}
+
+private fun idleSnap(snap: Snap): Snap {
+    val lengths = stretchLengths(snap.workMillis, stretchCount(snap.shortCount, snap.longCount))
+    return snap.copy(
+        status = "idle",
+        kind = "focus",
+        awaitingKind = "",
+        focusDone = 0,
+        stretchIndex = 0,
+        sessionId = null,
+        workedMs = 0,
+        phaseMillis = lengths.first(),
+        alarmAtEpoch = 0,
+        alarmAtElapsed = 0,
+        completionToken = "",
+        sessionStartedEpoch = 0,
+        pauseCount = 0,
+        pauseTotalMs = 0,
+        pauseStartedEpoch = 0,
+    )
 }
 
 private fun sessionRec(
@@ -387,7 +499,14 @@ fun pauseSnap(snap: Snap, nowEpoch: Long, nowElapsed: Long): Step {
     if (snap.status != "running") return Step(snap, emptyList(), false, false)
     val worked = elapsedWork(snap, nowEpoch, nowElapsed)
     return Step(
-        snap.copy(status = "paused", workedMs = worked, alarmAtEpoch = 0, alarmAtElapsed = 0),
+        snap.copy(
+            status = "paused",
+            workedMs = worked,
+            alarmAtEpoch = 0,
+            alarmAtElapsed = 0,
+            pauseCount = snap.pauseCount + 1,
+            pauseStartedEpoch = nowEpoch,
+        ),
         emptyList(),
         alarm = false,
         chime = false,
@@ -397,6 +516,7 @@ fun pauseSnap(snap: Snap, nowEpoch: Long, nowElapsed: Long): Step {
 fun resumeSnap(snap: Snap, nowEpoch: Long, nowElapsed: Long, token: String): Step {
     if (snap.status != "paused") return Step(snap, emptyList(), false, false)
     val left = (snap.phaseMillis - snap.workedMs).coerceAtLeast(0)
+    val added = if (snap.pauseStartedEpoch > 0L) (nowEpoch - snap.pauseStartedEpoch).coerceAtLeast(0L) else 0L
     val running = snap.copy(
         status = "running",
         stretchEpoch = nowEpoch,
@@ -404,6 +524,8 @@ fun resumeSnap(snap: Snap, nowEpoch: Long, nowElapsed: Long, token: String): Ste
         alarmAtEpoch = if (snap.kind == "track") 0 else nowEpoch + left,
         alarmAtElapsed = if (snap.kind == "track") 0 else nowElapsed + left,
         completionToken = token,
+        pauseTotalMs = snap.pauseTotalMs + added,
+        pauseStartedEpoch = 0,
     )
     return Step(running, emptyList(), alarm = snap.kind != "track", chime = false)
 }
@@ -421,43 +543,49 @@ fun finishSnap(
     val worked = elapsedWork(snap, nowEpoch, nowElapsed)
     val keep = worked >= MIN_KEEP_MS
     val closed = closeOf(snap, nowEpoch, nowElapsed, keep)
-    val count = mode != "stop" && snap.kind == "focus"
-    val (awaitKind, done) = if (mode == "stop" || snap.kind == "track") {
-        "focus" to 0
-    } else if (count || snap.kind == "short" || snap.kind == "long") {
-        if (snap.kind == "focus" && !count) "focus" to snap.focusDone else nextAfter(snap.kind, snap.focusDone, snap.cycles)
-    } else {
-        "focus" to snap.focusDone
-    }
-    val idleBase = snap.copy(
-        status = if (mode == "stop" || snap.kind == "track") "idle" else "awaiting",
-        kind = if (mode == "stop" || snap.kind == "track") "focus" else awaitKind,
-        awaitingKind = if (mode == "stop" || snap.kind == "track") "" else awaitKind,
-        focusDone = done,
-        sessionId = null,
-        workedMs = 0,
-        phaseMillis = phaseLength(snap, if (mode == "stop" || snap.kind == "track") "focus" else awaitKind),
-        alarmAtEpoch = 0,
-        alarmAtElapsed = 0,
-        completionToken = "",
-        sessionStartedEpoch = 0,
-    )
     val chime = mode == "due"
-    if (idleBase.status == "awaiting" && snap.autoStart) {
-        val hint = StartHint(
-            snap.projectId,
-            snap.projectName,
-            snap.groupName,
-            snap.taskId,
-            snap.taskTitle,
-            snap.writerId,
-            nextSessionId,
-            nextToken,
-        )
-        val armed = arm(idleBase.copy(status = "idle", awaitingKind = ""), awaitKind, nowEpoch, nowElapsed, hint)
-        return Step(armed.snap.copy(focusDone = done), listOf(closed) + armed.writes, alarm = armed.alarm, chime = chime)
+    if (mode == "stop" || snap.kind == "track") {
+        return Step(idleSnap(snap), listOf(closed), alarm = false, chime = false)
     }
-    return Step(idleBase, listOf(closed), alarm = false, chime = chime)
+    val carried = foldPause(snap, nowEpoch)
+    val count = stretchCount(snap.shortCount, snap.longCount)
+    val plan = breakKinds(snap.shortCount, snap.longCount)
+    if (snap.kind == "focus") {
+        val next = snap.stretchIndex + 1
+        if (next >= count || snap.stretchIndex !in plan.indices) {
+            return Step(idleSnap(snap), listOf(closed), alarm = false, chime = chime)
+        }
+        val hint = hintOf(snap, nextSessionId, nextToken)
+        val base = carried.copy(
+            status = "idle",
+            awaitingKind = "",
+            stretchIndex = next,
+            focusDone = next,
+            sessionId = null,
+        )
+        val armed = arm(base, plan[snap.stretchIndex], nowEpoch, nowElapsed, hint)
+        return Step(armed.snap, listOf(closed) + armed.writes, alarm = true, chime = chime)
+    }
+    if (snap.kind == "short" || snap.kind == "long") {
+        val lengths = stretchLengths(snap.workMillis, count)
+        val index = snap.stretchIndex.coerceIn(0, lengths.lastIndex)
+        val waiting = carried.copy(
+            status = "awaiting",
+            kind = "focus",
+            awaitingKind = "focus",
+            focusDone = index,
+            phaseMillis = lengths[index],
+            sessionId = null,
+            workedMs = 0,
+            alarmAtEpoch = 0,
+            alarmAtElapsed = 0,
+            completionToken = "",
+            sessionStartedEpoch = 0,
+            pauseStartedEpoch = 0,
+        )
+        return Step(waiting, listOf(closed), alarm = false, chime = chime)
+    }
+    return Step(idleSnap(snap), listOf(closed), alarm = false, chime = false)
 }
 
 fun beginRest(
@@ -500,30 +628,28 @@ fun beginRest(
     return Step(armed.snap.copy(focusDone = done), listOf(closed) + armed.writes, alarm = true, chime = false)
 }
 
-fun withSettings(snap: Snap, focus: Int, short: Int, long: Int, cycles: Int, countUp: Boolean, auto: Boolean): Snap {
-    if (snap.status == "running" || snap.status == "paused") {
-        return snap.copy(autoStart = auto)
-    }
-    return snap.copy(
-        focusMin = focus.coerceIn(1, 180),
-        shortMin = short.coerceIn(1, 60),
-        longMin = long.coerceIn(1, 120),
-        cycles = cycles.coerceIn(1, 12),
-        countUp = countUp,
-        autoStart = auto,
-        phaseMillis = if (snap.status == "awaiting") {
-            phaseLength(
-                snap.copy(
-                    focusMin = focus.coerceIn(1, 180),
-                    shortMin = short.coerceIn(1, 60),
-                    longMin = long.coerceIn(1, 120),
-                ),
-                snap.awaitingKind.ifEmpty { "focus" },
-            )
-        } else {
-            snap.phaseMillis
-        },
+fun withSettings(
+    snap: Snap,
+    workMillis: Long,
+    shortMillis: Long,
+    longMillis: Long,
+    shortCount: Int,
+    longCount: Int,
+): Snap {
+    if (snap.status == "running" || snap.status == "paused" || snap.status == "awaiting") return snap
+    val work = workMillis.coerceAtLeast(1_000L)
+    val shorts = shortCount.coerceIn(0, 24)
+    val longs = longCount.coerceIn(0, 24)
+    val next = snap.copy(
+        workMillis = work,
+        shortMillis = shortMillis.coerceAtLeast(1_000L),
+        longMillis = longMillis.coerceAtLeast(1_000L),
+        shortCount = shorts,
+        longCount = longs,
+        stretchIndex = 0,
+        kind = "focus",
     )
+    return next.copy(phaseMillis = phaseLength(next, "focus"))
 }
 
 fun manualSession(

@@ -12,7 +12,16 @@ const val KIND_LOCAL = "local"
 
 val SYNC_KINDS = setOf(KIND_GROUP, KIND_TAG, KIND_PROJECT, KIND_TASK, KIND_SESSION, KIND_PREF)
 
-val TIMER_PREF_IDS = setOf("focus_min", "short_min", "long_min", "cycles", "count_up")
+val TIMER_PREF_IDS = setOf(
+    "focus_min", "short_min", "long_min", "cycles", "count_up",
+    "work_sec", "short_sec", "long_sec", "short_count", "long_count",
+)
+
+const val DEFAULT_WORK_MS = 3_600_000L
+const val DEFAULT_SHORT_BREAKS = 2
+const val DEFAULT_LONG_BREAKS = 0
+const val DEFAULT_SHORT_MS = 300_000L
+const val DEFAULT_LONG_MS = 900_000L
 
 const val GROUP_WORK = "g-work"
 const val GROUP_STUDY = "g-study"

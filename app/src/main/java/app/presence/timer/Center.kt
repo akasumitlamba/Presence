@@ -32,7 +32,18 @@ class TimerCenter(
             val resolved = project ?: current.projectId?.let { id ->
                 repo.snapshot().find { it.kind == KIND_PROJECT && it.id == id && !it.deleted }
             }
-            val tuned = tune(current, resolved)
+            val tunedBase = tune(current, resolved)
+            val tuned = if (current.status == "awaiting") {
+                tunedBase
+            } else {
+                tunedBase.copy(
+                    stretchIndex = 0,
+                    pauseCount = 0,
+                    pauseTotalMs = 0,
+                    pauseStartedEpoch = 0,
+                    focusDone = 0,
+                )
+            }
             val nowE = System.currentTimeMillis()
             val nowL = android.os.SystemClock.elapsedRealtime()
             val hint = if (resolved == null && current.projectId != null) {
@@ -103,7 +114,7 @@ class TimerCenter(
         synchronized(lock) {
             val current = repo.currentSnap()
             val globals = repo.globals()
-            val next = withSettings(current, globals.focus, globals.short, globals.long, globals.cycles, globals.countUp, globals.auto)
+            val next = withSettings(current, globals.workMillis, globals.shortMillis, globals.longMillis, globals.shortCount, globals.longCount)
             if (next != current) {
                 repo.saveSnap(next)
                 react(Step(next, emptyList(), alarm = false, chime = false))
@@ -127,19 +138,19 @@ class TimerCenter(
 
     private fun tune(snap: Snap, project: Rec?): Snap {
         val globals = repo.globals()
-        var focus = globals.focus
-        var short = globals.short
-        var long = globals.long
-        var cycles = globals.cycles
-        var countUp = globals.countUp
+        var work = globals.workMillis
+        var shortMs = globals.shortMillis
+        var longMs = globals.longMillis
+        var shorts = globals.shortCount
+        var longs = globals.longCount
         if (project != null) {
-            project.f("focus").toIntOrNull()?.let { focus = it.coerceIn(1, 180) }
-            project.f("short").toIntOrNull()?.let { short = it.coerceIn(1, 60) }
-            project.f("long").toIntOrNull()?.let { long = it.coerceIn(1, 120) }
-            project.f("cycles").toIntOrNull()?.let { cycles = it.coerceIn(1, 12) }
-            if (project.f("countUp").isNotEmpty()) countUp = project.f("countUp") == "1"
+            project.f("workSec").toLongOrNull()?.let { work = it.coerceAtLeast(1L) * 1000L }
+            project.f("shortSec").toLongOrNull()?.let { shortMs = it.coerceAtLeast(1L) * 1000L }
+            project.f("longSec").toLongOrNull()?.let { longMs = it.coerceAtLeast(1L) * 1000L }
+            project.f("shortCount").toIntOrNull()?.let { shorts = it.coerceIn(0, 24) }
+            project.f("longCount").toIntOrNull()?.let { longs = it.coerceIn(0, 24) }
         }
-        return withSettings(snap, focus, short, long, cycles, countUp, globals.auto)
+        return withSettings(snap, work, shortMs, longMs, shorts, longs)
     }
 
     private fun hint(project: Rec?, task: Rec?): StartHint {

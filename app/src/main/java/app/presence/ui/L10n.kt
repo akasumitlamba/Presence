@@ -32,6 +32,7 @@ class T(lang: String) {
     val track = s("Track", "Takip", "Registro", "Registo", "Suivi", "計測", "기록")
     val startFocus = s("Start focus", "Odağı başlat", "Empezar enfoque", "Começar foco", "Lancer le focus", "集中を始める", "집중 시작")
     val pause = s("Pause", "Duraklat", "Pausa", "Pausar", "Pause", "一時停止", "일시정지")
+    val play = s("Play", "Oynat", "Reproducir", "Reproduzir", "Lecture", "再生", "재생")
     val resume = s("Resume", "Sürdür", "Seguir", "Retomar", "Reprendre", "再開", "계속")
     val stop = s("Stop", "Bitir", "Parar", "Parar", "Arrêter", "終了", "종료")
     val skip = s("Skip", "Geç", "Saltar", "Saltar", "Passer", "スキップ", "건너뛰기")
@@ -87,6 +88,37 @@ class T(lang: String) {
     val ownTimer = s("Lengths for this project", "Bu projeye özel süreler", "Duraciones de este proyecto", "Durações deste projeto", "Durées de ce projet", "このプロジェクトの長さ", "이 프로젝트의 길이")
     val hours = s("Hours", "Saat", "Horas", "Horas", "Heures", "時間", "시간")
     val minutes = s("Minutes", "Dakika", "Minutos", "Minutos", "Minutes", "分", "분")
+    val seconds = s("Seconds", "Saniye", "Segundos", "Segundos", "Secondes", "秒", "초")
+    val workTime = s("Work time", "Çalışma süresi", "Tiempo de trabajo", "Tempo de trabalho", "Temps de travail", "作業時間", "작업 시간")
+    val workHelp = s(
+        "The whole project. It is split into equal stretches.",
+        "Projenin tümü. Eşit dilimlere bölünür.",
+        "El proyecto entero. Se reparte en tramos iguales.",
+        "O projeto inteiro. Divide-se em trechos iguais.",
+        "Tout le projet. Il se partage en passages égaux.",
+        "プロジェクト全体。等しい区間に分かれます。",
+        "프로젝트 전체. 같은 길이의 구간으로 나뉩니다.",
+    )
+    val shortBreaks = s("Short breaks", "Kısa molalar", "Descansos cortos", "Pausas curtas", "Pauses courtes", "小休止", "짧은 쉼")
+    val longBreaks = s("Long breaks", "Uzun molalar", "Descansos largos", "Pausas longas", "Pauses longues", "長休止", "긴 쉼")
+    val shortCountHelp = s(
+        "How many of the gaps are a short break.",
+        "Aralıklardan kaçı kısa mola.",
+        "Cuántos huecos son un descanso corto.",
+        "Quantos intervalos são uma pausa curta.",
+        "Combien d’intervalles sont une pause courte.",
+        "隙間のうち短い休止の数。",
+        "사이 중 짧은 쉼의 수.",
+    )
+    val longCountHelp = s(
+        "How many of the gaps are a long break. They are spaced out.",
+        "Aralıklardan kaçı uzun mola. Aralara yayılır.",
+        "Cuántos huecos son un descanso largo. Se reparten.",
+        "Quantos intervalos são uma pausa longa. Ficam espaçados.",
+        "Combien d’intervalles sont une pause longue. Elles sont espacées.",
+        "隙間のうち長い休止の数。均等に置きます。",
+        "사이 중 긴 쉼의 수. 고르게 둡니다.",
+    )
     val week = s("Week", "Hafta", "Semana", "Semana", "Semaine", "週", "주")
     val month = s("Month", "Ay", "Mes", "Mês", "Mois", "月", "월")
     val year = s("Year", "Yıl", "Año", "Ano", "Année", "年", "연")
@@ -295,6 +327,26 @@ class T(lang: String) {
     val sdFailed = s("The database stayed where it was.", "Veritabanı yerinde kaldı.", "La base de datos se quedó donde estaba.", "A base de dados ficou onde estava.", "La base est restée où elle était.", "データベースはそのままです。", "데이터베이스는 그대로입니다.")
     val sdCheck = s("Check again", "Yeniden bak", "Comprobar otra vez", "Verificar de novo", "Vérifier encore", "もう一度見る", "다시 확인")
     val streak = s("Streak", "Seri", "Racha", "Sequência", "Série", "連続", "연속")
+
+    fun stretchSummary(count: Int, each: String) = s(
+        "$count stretches · $each each",
+        "$count dilim · her biri $each",
+        "$count tramos · $each cada uno",
+        "$count trechos · $each cada",
+        "$count passages · $each chacun",
+        "$count 区間 · それぞれ $each",
+        "$count 구간 · 각각 $each",
+    )
+
+    fun pauses(count: Int, time: String) = s(
+        "$count pauses · $time",
+        "$count duraklama · $time",
+        "$count pausas · $time",
+        "$count pausas · $time",
+        "$count pauses · $time",
+        "一時停止 $count · $time",
+        "일시정지 $count · $time",
+    )
 
     fun streakLine(count: Int, logged: Boolean): String = when {
         count <= 0 -> s("No streak yet", "Henüz seri yok", "Aún no hay racha", "Ainda não há sequência", "Pas encore de série", "まだ連続はありません", "아직 연속이 없습니다")

@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -103,6 +104,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -135,6 +137,10 @@ import app.presence.core.f
 import app.presence.core.freeProjectIds
 import app.presence.core.manualSession
 import app.presence.core.overlapsOpen
+import app.presence.core.pauseNoteMillis
+import app.presence.core.sessionOpen
+import app.presence.core.stretchCount
+import app.presence.core.stretchLengths
 import app.presence.core.sessionsCsv
 import app.presence.core.SYNC_KINDS
 import app.presence.core.sessionCountedMillis
@@ -150,7 +156,9 @@ import java.time.format.TextStyle
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.sin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -219,7 +227,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     var tick by remember { mutableIntStateOf(0) }
     val snap = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "snapshot" && !it.deleted }?.let { snapFrom(it.body) } ?: Snap()
     LaunchedEffect(snap.status, snap.completionToken) {
-        while (snap.status == "running") {
+        while (snap.status == "running" || snap.status == "paused") {
             delay(200)
             tick++
         }
@@ -312,7 +320,7 @@ private fun Mini(t: T, snap: Snap, shown: Long, onOpen: () -> Unit) {
                 Text(snap.projectName.ifBlank { t.unlabeled } + " · " + clockDigits(shown))
             }
             TextButton(onClick = { if (snap.status == "paused") app.center.resume() else app.center.pause() }) {
-                Text(if (snap.status == "paused") t.resume else t.pause)
+                Text(if (snap.status == "paused") t.play else t.pause)
             }
         }
     }
@@ -347,24 +355,22 @@ private fun TimerPage(
     val project = projects.find { it.id == selected }
     val tasks = rows.alive(KIND_TASK).filter { it.f("projectId") == project?.id && it.f("done") != "1" }
     val task = tasks.find { it.id == taskId }
-    val length = if (snap.phaseMillis <= 0L) 1f else (shown.toFloat() / snap.phaseMillis).coerceIn(0f, 1f)
-    val progress = when {
-        snap.kind == "track" -> 1f
-        snap.countUp -> length
-        snap.status == "idle" || snap.status == "awaiting" -> 1f
-        else -> length
-    }
-    val label = when (snap.status) {
-        "awaiting" -> phase(t, snap.awaitingKind.ifEmpty { "focus" })
-        "idle" -> t.focus
+    val globals = app.repo.globals()
+    val open = sessionOpen(snap)
+    val planWork = if (open) snap.workMillis else project?.f("workSec")?.toLongOrNull()?.times(1_000L) ?: globals.workMillis
+    val planShorts = if (open) snap.shortCount else project?.f("shortCount")?.toIntOrNull() ?: globals.shortCount
+    val planLongs = if (open) snap.longCount else project?.f("longCount")?.toIntOrNull() ?: globals.longCount
+    val stretches = stretchCount(planShorts, planLongs)
+    val lengths = stretchLengths(planWork, stretches)
+    val label = when {
+        snap.status == "idle" || snap.status == "awaiting" -> t.focus
         else -> phase(t, snap.kind)
     }
-    val primary = when (snap.status) {
-        "running" -> t.pause
-        "paused" -> t.resume
-        "awaiting" -> t.startNext
-        else -> t.startFocus
-    }
+    val face = if (snap.status == "idle") lengths.first() else shown
+    val loggedId = if (open) snap.projectId else project?.id
+    val logged = if (loggedId == null) 0L else workedMillisFor(rows, loggedId)
+    val liveWork = if (open && snap.kind == "focus" && snap.phaseMillis > 0L) (snap.phaseMillis - shown).coerceAtLeast(0L) else 0L
+    val spent = logged + liveWork
     val notificationsOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
     val controls: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -410,72 +416,28 @@ private fun TimerPage(
                 }
             }
             val canBegin = project != null
-            val actionMod = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)
-            if (wide && snap.status == "idle") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    PresenceButton(onClick = {
-                        val chosen = project
-                        if (chosen != null) {
-                            if (!premium && chosen.id !in free) onGate()
-                            else app.center.start("focus", chosen, task)
-                        }
-                    }, enabled = canBegin, modifier = Modifier.heightIn(min = 56.dp)) { Text(primary) }
-                    Explain(t.focusModeHelp)
-                    TonalButton(onClick = {
-                        val chosen = project
-                        if (chosen != null) {
-                            if (!premium && chosen.id !in free) onGate() else app.center.start("track", chosen, task)
-                        }
-                    }, enabled = canBegin, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.trackTime) }
-                    Explain(t.trackModeHelp)
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PresenceButton(onClick = {
-                        when (snap.status) {
-                            "running" -> app.center.pause()
-                            "paused" -> app.center.resume()
-                            "awaiting" -> app.center.start(snap.awaitingKind.ifEmpty { "focus" }, project, task)
-                            else -> {
-                                val chosen = project
-                                if (chosen != null) {
-                                    if (!premium && chosen.id !in free) onGate()
-                                    else app.center.start("focus", chosen, task)
-                                }
-                            }
-                        }
-                    }, enabled = snap.status == "running" || snap.status == "paused" || snap.status == "awaiting" || canBegin, modifier = Modifier.weight(1f).heightIn(min = 56.dp)) { Text(primary) }
-                    if (snap.status == "idle") Explain(t.focusModeHelp)
-                }
-                if (snap.status == "idle") {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TonalButton(onClick = {
+            val playMod = if (wide) Modifier.heightIn(min = 56.dp) else Modifier.weight(1f).heightIn(min = 56.dp)
+            val stopMod = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                PresenceButton(onClick = {
+                    when (snap.status) {
+                        "running" -> app.center.pause()
+                        "paused" -> app.center.resume()
+                        "awaiting" -> app.center.start("focus", project, task)
+                        else -> {
                             val chosen = project
                             if (chosen != null) {
-                                if (!premium && chosen.id !in free) onGate() else app.center.start("track", chosen, task)
+                                if (!premium && chosen.id !in free) onGate()
+                                else app.center.start("focus", chosen, task)
                             }
-                        }, enabled = canBegin, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
-                        Explain(t.trackModeHelp)
+                        }
                     }
+                }, enabled = open || canBegin, modifier = playMod) {
+                    Text(if (snap.status == "running") t.pause else t.play)
                 }
-            }
-            if (snap.status == "running" || snap.status == "paused") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TonalButton(onClick = { app.center.stop() }, modifier = actionMod) { Text(t.stop) }
-                    if (snap.kind != "track") {
-                        TonalButton(onClick = { app.center.skip() }, modifier = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.skip) }
-                        Explain(t.skipHelp)
-                    }
+                if (open) {
+                    TonalButton(onClick = { app.center.stop() }, modifier = stopMod) { Text(t.stop) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TonalButton(onClick = { app.center.beginRest("short") }, enabled = snap.kind != "short", modifier = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.startShort) }
-                    Explain(t.shortNowHelp)
-                    TonalButton(onClick = { app.center.beginRest("long") }, enabled = snap.kind != "long", modifier = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.startLong) }
-                    Explain(t.longNowHelp)
-                }
-            }
-            if (snap.status == "running" || snap.status == "paused" || snap.status == "awaiting") {
-                Text(t.cycleLine(snap.focusDone, snap.cycles), style = MaterialTheme.typography.bodyMedium)
             }
             if (snap.status == "awaiting") Text(t.waiting)
             if (!notificationsOn) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
@@ -485,26 +447,77 @@ private fun TimerPage(
         Box(Modifier.size(280.dp), contentAlignment = Alignment.Center) {
             val color = MaterialTheme.colorScheme.primary
             val track = MaterialTheme.colorScheme.outline
+            val dot = MaterialTheme.colorScheme.onSurface
             Canvas(Modifier.fillMaxSize().padding(12.dp)) {
-                drawArc(track, 0f, 360f, false, style = Stroke(22f, cap = StrokeCap.Round))
-                drawArc(color, -90f, 360f * progress, false, style = Stroke(22f, cap = StrokeCap.Round))
+                val gapDeg = 16f
+                val sweep = ((360f - gapDeg * stretches) / stretches).coerceAtLeast(8f)
+                val stroke = Stroke(22f, cap = StrokeCap.Round)
+                val onStretch = snap.kind == "focus" && (snap.status == "running" || snap.status == "paused")
+                val doneCount = when {
+                    snap.status == "idle" -> 0
+                    onStretch -> snap.stretchIndex.coerceIn(0, stretches)
+                    else -> snap.stretchIndex.coerceIn(0, stretches)
+                }
+                val partial = if (onStretch && snap.phaseMillis > 0L) {
+                    (1f - shown.toFloat() / snap.phaseMillis.toFloat()).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+                for (index in 0 until stretches) {
+                    val start = -90f + index * (sweep + gapDeg)
+                    drawArc(track, start, sweep, false, style = stroke)
+                    val fill = when {
+                        index < doneCount -> sweep
+                        index == snap.stretchIndex && onStretch -> sweep * partial
+                        else -> 0f
+                    }
+                    if (fill > 0.5f) drawArc(color, start, fill, false, style = stroke)
+                }
+                val dotAngle = when {
+                    snap.status == "idle" -> -90f
+                    onStretch -> -90f + snap.stretchIndex.coerceIn(0, stretches - 1) * (sweep + gapDeg) + sweep * partial
+                    doneCount <= 0 -> -90f
+                    else -> -90f + (doneCount - 1) * (sweep + gapDeg) + sweep + gapDeg / 2f
+                }
+                val radius = size.minDimension / 2f - 11f
+                val rad = Math.toRadians(dotAngle.toDouble())
+                drawCircle(
+                    color = dot,
+                    radius = 7f,
+                    center = Offset(center.x + cos(rad).toFloat() * radius, center.y + sin(rad).toFloat() * radius),
+                )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(label, style = MaterialTheme.typography.titleMedium)
-                Text(clockDigits(if (snap.status == "idle") (app.repo.globals().focus * 60_000L) else shown), style = MaterialTheme.typography.displayLarge)
+                Text(clockDigits(face), style = MaterialTheme.typography.displayLarge)
+                Text(clockDigits(spent), style = MaterialTheme.typography.titleMedium)
             }
         }
     }
-    if (wide) {
-        Row(Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { ring() }
-            Column(Modifier.weight(1f)) { controls() }
+    Box(Modifier.fillMaxSize()) {
+        if (wide) {
+            Row(Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { ring() }
+                Column(Modifier.weight(1f)) { controls() }
+            }
+        } else {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = if (open) 40.dp else 0.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.height(12.dp))
+                ring()
+                controls()
+            }
         }
-    } else {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(12.dp))
-            ring()
-            controls()
+        if (open) {
+            Text(
+                t.pauses(snap.pauseCount, clockDigits(pauseNoteMillis(snap, System.currentTimeMillis()))),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.End,
+            )
         }
     }
     if (pending != null) {
@@ -512,7 +525,7 @@ private fun TimerPage(
             val next = pending
             pending = null
             app.center.stop()
-            if (next != null) app.center.start("track", next, null)
+            if (next != null) app.center.start("focus", next, null)
         }, { pending = null })
     }
     if (creating) {
@@ -587,15 +600,15 @@ private fun ProjectsPage(
                         TextButton(onClick = {
                             if (locked) onGate() else {
                                 val snap = app.center.snap()
-                                if ((snap.status == "running" || snap.status == "paused") && !(snap.kind == "track" && snap.projectId == project.id)) {
-                                    pendingPlay = project
-                                } else if (snap.kind == "track" && snap.projectId == project.id && (snap.status == "running" || snap.status == "paused")) {
-                                    app.center.stop()
-                                } else {
-                                    app.center.start("track", project, null)
-                                }
+                                val mine = sessionOpen(snap) && snap.projectId == project.id
+                                if (mine) app.center.stop()
+                                else if (sessionOpen(snap)) pendingPlay = project
+                                else app.center.start("focus", project, null)
                             }
-                        }) { Text(if (app.center.snap().projectId == project.id && app.center.snap().kind == "track" && app.center.snap().status != "idle") t.stop else t.track) }
+                        }) {
+                            val snap = app.center.snap()
+                            Text(if (sessionOpen(snap) && snap.projectId == project.id) t.stop else t.play)
+                        }
                         TextButton(onClick = { confirmDelete = project }) { Text(t.delete) }
                         DropdownMenu(expanded = menuFor == project.id, onDismissRequest = { menuFor = null }) {
                             DropdownMenuItem(text = { Text(t.moveUp) }, onClick = { menuFor = null; move(app, projects, project, -1) })
@@ -658,7 +671,7 @@ private fun ProjectsPage(
         Confirm(t.switchTitle, t.switchBody, t.save, t.cancel, {
             pendingPlay = null
             app.center.stop()
-            app.center.start("track", project, null)
+            app.center.start("focus", project, null)
         }, { pendingPlay = null })
     }
 }
@@ -723,19 +736,27 @@ private fun ProjectDetail(
     var deleteTask by remember { mutableStateOf<Rec?>(null) }
     var newTag by remember { mutableStateOf(false) }
     var editTag by remember { mutableStateOf<Rec?>(null) }
-    var name by remember(project.id, project.f("name")) { mutableStateOf(project.f("name")) }
+    var name by remember(project.id) { mutableStateOf(project.f("name")) }
     val zone = ZoneId.systemDefault()
     val globals = app.repo.globals()
     val worked = workedMillisFor(rows, project.id)
     val shownTasks = tasks.filter { taskFilter == null || it.f("tags").split(",").contains(taskFilter) }
     Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(name, { name = it }, label = { Text(t.name) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
-        PresenceButton(onClick = {
-            if (name.isBlank()) return@PresenceButton
-            val body = project.body.toMutableMap()
-            body["name"] = name.trim()
-            app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
-        }) { Text(t.save) }
+        OutlinedTextField(
+            name,
+            { value ->
+                name = value
+                val trimmed = value.trim()
+                if (trimmed.isNotEmpty() && trimmed != project.f("name")) {
+                    val body = project.body.toMutableMap()
+                    body["name"] = trimmed
+                    app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
+                }
+            },
+            label = { Text(t.name) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = presenceFieldColors(),
+        )
         Text(t.goal, style = MaterialTheme.typography.titleLarge)
         val goalMinutes = project.f("goalMinutes").toIntOrNull()
         val deadline = project.f("goalDeadline").toLongOrNull()
@@ -766,8 +787,11 @@ private fun ProjectDetail(
         if (!premium) {
             TextButton(onClick = onGate) { Text(t.locked) }
         } else {
-            OwnTimer(t, project) { body ->
+            ProjectPlanFields(t, project, globals) { key, value ->
+                val body = project.body.toMutableMap()
+                body[key] = value
                 app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
+                app.center.refreshSettings()
             }
         }
         Text(t.tags, style = MaterialTheme.typography.titleLarge)
@@ -869,37 +893,127 @@ private fun ProjectDetail(
 }
 
 @Composable
-private fun OwnTimer(t: T, project: Rec, onSave: (Map<String, String>) -> Unit) {
-    var focus by remember(project.id) { mutableStateOf(project.f("focus")) }
-    var short by remember(project.id) { mutableStateOf(project.f("short")) }
-    var long by remember(project.id) { mutableStateOf(project.f("long")) }
-    var cycles by remember(project.id) { mutableStateOf(project.f("cycles")) }
-    var up by remember(project.id) { mutableStateOf(project.f("countUp") == "1") }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        NumberRow(t.focusLen, focus) { focus = it }
-        NumberRow(t.shortLen, short) { short = it }
-        NumberRow(t.longLen, long) { long = it }
-        NumberRow(t.cycles, cycles) { cycles = it }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(t.countUp, modifier = Modifier.weight(1f))
-            Explain(t.countUpHelp)
-            PresenceSwitch(checked = up, onCheckedChange = { up = it })
+private fun PlanSections(
+    t: T,
+    workSec: Long,
+    shortCount: Int,
+    longCount: Int,
+    shortSec: Long,
+    longSec: Long,
+    onWork: (Long) -> Unit,
+    onShortCount: (Int) -> Unit,
+    onLongCount: (Int) -> Unit,
+    onShort: (Long) -> Unit,
+    onLong: (Long) -> Unit,
+) {
+    val lengths = stretchLengths(workSec.coerceAtLeast(1L) * 1_000L, stretchCount(shortCount, longCount))
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        FieldSection(t.workTime, t.workHelp) {
+            HmsFields(t, workSec, onWork)
+            Text(t.stretchSummary(stretchCount(shortCount, longCount), clockDigits(lengths.first())), color = MaterialTheme.colorScheme.onSurface)
         }
-        PresenceButton(onClick = {
-            val body = project.body.toMutableMap()
-            body["focus"] = focus
-            body["short"] = short
-            body["long"] = long
-            body["cycles"] = cycles
-            body["countUp"] = if (up) "1" else "0"
-            onSave(body)
-        }) { Text(t.save) }
+        FieldSection(t.shortBreaks, t.shortCountHelp) {
+            CountStepper(t, t.shortBreaks, shortCount, 0, 12, onShortCount)
+            HmsFields(t, shortSec, onShort)
+        }
+        FieldSection(t.longBreaks, t.longCountHelp) {
+            CountStepper(t, t.longBreaks, longCount, 0, 12, onLongCount)
+            HmsFields(t, longSec, onLong)
+        }
     }
 }
 
 @Composable
-private fun NumberRow(label: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(value, onChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
+private fun FieldSection(title: String, help: String, content: @Composable () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Explain(help)
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun HmsFields(t: T, totalSec: Long, onSec: (Long) -> Unit) {
+    val parts = splitSeconds(totalSec)
+    var hours by remember(totalSec) { mutableStateOf(parts.first.toString()) }
+    var minutes by remember(totalSec) { mutableStateOf(parts.second.toString()) }
+    var seconds by remember(totalSec) { mutableStateOf(parts.third.toString()) }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        UnitBox(t.hours, hours) {
+            hours = it
+            onSec(joinSeconds(it, minutes, seconds))
+        }
+        UnitBox(t.minutes, minutes) {
+            minutes = it
+            onSec(joinSeconds(hours, it, seconds))
+        }
+        UnitBox(t.seconds, seconds) {
+            seconds = it
+            onSec(joinSeconds(hours, minutes, it))
+        }
+    }
+}
+
+@Composable
+private fun UnitBox(label: String, value: String, onValue: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { raw -> onValue(raw.filter { it.isDigit() }.take(2)) },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.width(104.dp),
+        colors = presenceFieldColors(),
+    )
+}
+
+private fun splitSeconds(total: Long): Triple<Int, Int, Int> {
+    val safe = total.coerceAtLeast(0L)
+    return Triple((safe / 3600L).toInt(), ((safe % 3600L) / 60L).toInt(), (safe % 60L).toInt())
+}
+
+private fun joinSeconds(hours: String, minutes: String, seconds: String): Long {
+    val h = (hours.toIntOrNull() ?: 0).coerceIn(0, 99)
+    val m = (minutes.toIntOrNull() ?: 0).coerceIn(0, 59)
+    val s = (seconds.toIntOrNull() ?: 0).coerceIn(0, 59)
+    return h * 3600L + m * 60L + s
+}
+
+@Composable
+private fun ProjectPlanFields(
+    t: T,
+    project: Rec,
+    globals: app.presence.data.Globals,
+    onField: (String, String) -> Unit,
+) {
+    val workSec = project.f("workSec").toLongOrNull() ?: globals.workMillis / 1000L
+    val shortCount = project.f("shortCount").toIntOrNull() ?: globals.shortCount
+    val longCount = project.f("longCount").toIntOrNull() ?: globals.longCount
+    val shortSec = project.f("shortSec").toLongOrNull() ?: globals.shortMillis / 1000L
+    val longSec = project.f("longSec").toLongOrNull() ?: globals.longMillis / 1000L
+    PlanSections(
+        t = t,
+        workSec = workSec,
+        shortCount = shortCount,
+        longCount = longCount,
+        shortSec = shortSec,
+        longSec = longSec,
+        onWork = { onField("workSec", it.coerceAtLeast(1L).toString()) },
+        onShortCount = { onField("shortCount", it.toString()) },
+        onLongCount = { onField("longCount", it.toString()) },
+        onShort = { onField("shortSec", it.coerceAtLeast(1L).toString()) },
+        onLong = { onField("longSec", it.coerceAtLeast(1L).toString()) },
+    )
 }
 
 @Composable
@@ -1424,12 +1538,19 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
     }
     val timerPane: @Composable () -> Unit = {
         Text(t.timerSettings, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        Stepper(t, t.focusLen, t.focusHelp, globals.focus, 1, 180) { app.repo.setPref("focus_min", it.toString()); app.center.refreshSettings() }
-        Stepper(t, t.shortLen, t.shortHelp, globals.short, 1, 60) { app.repo.setPref("short_min", it.toString()); app.center.refreshSettings() }
-        Stepper(t, t.longLen, t.longHelp, globals.long, 1, 120) { app.repo.setPref("long_min", it.toString()); app.center.refreshSettings() }
-        Stepper(t, t.cycles, t.cyclesHelp, globals.cycles, 1, 12) { app.repo.setPref("cycles", it.toString()); app.center.refreshSettings() }
-        SwitchSetting(t.countUp, t.countUpHelp, globals.countUp) { app.repo.setPref("count_up", if (it) "1" else "0"); app.center.refreshSettings() }
-        SwitchSetting(t.autoContinue, t.autoHelp, globals.auto) { app.repo.setPref("auto_start", if (it) "1" else "0"); app.center.refreshSettings() }
+        PlanSections(
+            t = t,
+            workSec = globals.workMillis / 1000L,
+            shortCount = globals.shortCount,
+            longCount = globals.longCount,
+            shortSec = globals.shortMillis / 1000L,
+            longSec = globals.longMillis / 1000L,
+            onWork = { app.repo.setPref("work_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
+            onShortCount = { app.repo.setPref("short_count", it.toString()); app.center.refreshSettings() },
+            onLongCount = { app.repo.setPref("long_count", it.toString()); app.center.refreshSettings() },
+            onShort = { app.repo.setPref("short_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
+            onLong = { app.repo.setPref("long_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
+        )
         Stepper(t, t.dayStarts, t.dayHelp, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
         Text(t.reminders, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         ReminderRow(t.dailyReminder, t.dailyHelp, globals.dailyOn, globals.dailyHour, globals.dailyMinute, { on ->
