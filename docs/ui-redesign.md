@@ -43,7 +43,7 @@ Native Android API 30, using real Compose screens and emulator-only database fix
 | Tablet portrait 800 × 1280 | 1200 × 1920 / 240 | All main destinations |
 | Resized/split-sized window 700 × 800 | 1050 × 1200 / 240 | All main destinations |
 
-All 22 light/dark palette combinations rendered; system day/night changes rendered. English and French were exercised. All three app text preferences were exercised with Android font scale 1.3. A todo draft survived native rotation with the keyboard open. A goal draft survived a single-pane to master/detail resize. Goal/manual-entry dialogs, project tags/tasks, lower settings/calendar regions and actual pairing-code generation/cancellation were exercised.
+All 22 light/dark palette combinations rendered; system day/night changes rendered. The release APK installed over the existing app; a palette selected through the actual settings picker persisted after process recreation. English and French were exercised. All three app text preferences were exercised with Android font scale 1.3. A todo draft survived native rotation with the keyboard open. A goal draft survived a single-pane to master/detail resize. Goal/manual-entry dialogs, project tags/tasks, lower settings/calendar regions and actual pairing-code generation/cancellation were exercised.
 
 Actual timer controls exercised idle, focus, paused/resumed, short break, waiting, long break, stopped and tracking. The timer ran with Wi-Fi and mobile data disabled and recovered after Home, screen lock and return. Three-button navigation and a gesture-navigation/corner-cutout configuration were captured. No AndroidRuntime crash was observed during these checks.
 
