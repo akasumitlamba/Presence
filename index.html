@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presence</title>
+  <meta name="description" content="Presence is a focus timer for Android. Download the app and keep sessions on your phone.">
+  <link rel="icon" href="mark.png" type="image/png">
+  <style>
+    @font-face {
+      font-family: "Source Sans 3";
+      src: url("app/src/main/res/font/source_sans_3_regular.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: block;
+    }
+    @font-face {
+      font-family: "Source Sans 3";
+      src: url("app/src/main/res/font/source_sans_3_semibold.ttf") format("truetype");
+      font-weight: 600;
+      font-style: normal;
+      font-display: block;
+    }
+
+    :root {
+      --ink: #143028;
+      --paper: #F3F6F4;
+      --leaf: #1F8A62;
+      --secondary: #3E5248;
+      --hairline: #D5E0DA;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { background: var(--paper); }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Source Sans 3", sans-serif;
+      font-weight: 400;
+      font-size: 1.125rem;
+      line-height: 1.45;
+      text-align: left;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem 1.25rem;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    h2 {
+      margin: 2rem 0 0.75rem;
+      font-size: 1.35rem;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .download {
+      display: inline-block;
+      background: var(--leaf);
+      color: var(--paper);
+      font-weight: 600;
+      font-size: 1.05rem;
+      line-height: 1.2;
+      text-decoration: none;
+      padding: 0.7rem 1rem;
+    }
+
+    .download:focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 3px;
+    }
+
+    main {
+      padding: 1.5rem 1.5rem 3rem;
+    }
+
+    .lead {
+      display: flex;
+      align-items: flex-start;
+      gap: 2rem;
+    }
+
+    .lead p,
+    ol,
+    dl {
+      max-width: 62ch;
+    }
+
+    .lead p {
+      margin: 0;
+      flex: 1 1 16rem;
+    }
+
+    .lead img {
+      width: 11rem;
+      height: auto;
+      flex: 0 0 auto;
+    }
+
+    ol {
+      margin: 0;
+      padding-left: 1.25rem;
+    }
+
+    li { margin: 0.35rem 0; }
+
+    dl { margin: 0; }
+
+    dt {
+      margin-top: 0.9rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--hairline);
+      font-weight: 600;
+    }
+
+    dt:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    dd {
+      margin: 0.2rem 0 0;
+      color: var(--secondary);
+    }
+
+    @media (max-width: 42rem) {
+      .lead { flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Presence</h1>
+    <a class="download" href="https://github.com/akasumitlamba/Presence/releases/download/v2.1.0/presence.apk">Download Presence</a>
+  </header>
+  <main>
+    <div class="lead">
+      <p>Presence is a focus timer for a phone. The session, the list, and the streak stay on the device.</p>
+      <img src="mark.png" width="219" height="263" alt="">
+    </div>
+
+    <h2>Install</h2>
+    <ol>
+      <li>Allow your browser to download the file.</li>
+      <li>Allow your phone to install it.</li>
+      <li>Open Presence.</li>
+    </ol>
+
+    <h2>What it does</h2>
+    <dl>
+      <dt>Timer</dt>
+      <dd>Focus, a short rest, and a long rest. Start or pause a session.</dd>
+      <dt>Todos</dt>
+      <dd>Add an item, mark it complete, or delete it.</dd>
+      <dt>Streak</dt>
+      <dd>The days in a row you have logged time.</dd>
+      <dt>Widgets</dt>
+      <dd>Session, stats, streak, and todos on the home screen. The session widget can start or pause.</dd>
+      <dt>Reminders</dt>
+      <dd>A daily reminder and a streak reminder, each at a time you set.</dd>
+      <dt>On-device</dt>
+      <dd>Projects, sessions, and todos stay on the phone.</dd>
+      <dt>No account</dt>
+      <dd>There is nothing to sign in to.</dd>
+    </dl>
+  </main>
+</body>
+</html>
