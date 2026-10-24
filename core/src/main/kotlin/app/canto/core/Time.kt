@@ -4,6 +4,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
 
@@ -127,9 +128,9 @@ fun clockDigits(ms: Long): String {
     val m = (safe % 3600) / 60
     val s = safe % 60
     return if (h > 0) {
-        "%d:%02d:%02d".format(h, m, s)
+        String.format(Locale.ROOT, "%d:%02d:%02d", h, m, s)
     } else {
-        "%d:%02d".format(m, s)
+        String.format(Locale.ROOT, "%d:%02d", m, s)
     }
 }
 
@@ -515,10 +516,16 @@ fun manualSession(
     ),
 )
 
-fun overlapsOpen(snap: Snap, startedAt: Long, durationMs: Long): Boolean {
+fun overlapsOpen(snap: Snap, startedAt: Long, durationMs: Long, nowEpoch: Long): Boolean {
     if (snap.status != "running" && snap.status != "paused") return false
     val openStart = snap.sessionStartedEpoch
-    val openEnd = if (snap.kind == "track") Long.MAX_VALUE / 4 else snap.alarmAtEpoch.takeIf { it > 0 } ?: (openStart + snap.phaseMillis)
+    val remaining = (snap.phaseMillis - snap.workedMs).coerceAtLeast(0)
+    val openEnd = when {
+        snap.kind == "track" -> Long.MAX_VALUE / 4
+        snap.status == "paused" -> nowEpoch + remaining
+        snap.alarmAtEpoch > 0 -> snap.alarmAtEpoch
+        else -> openStart + snap.phaseMillis
+    }
     val end = startedAt + durationMs
     return startedAt < openEnd && end > openStart
 }

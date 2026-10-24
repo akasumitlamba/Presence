@@ -8,6 +8,7 @@ import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.Locale
 
 class CoreTest {
     private val zone: ZoneId = ZoneId.of("UTC")
@@ -169,6 +170,43 @@ class CoreTest {
         val hint = StartHint("p", "Read", "Personal", "t", "Chapter", "phone", "sess", "tok")
         val snap = arm(Snap(countUp = true), "focus", 50, 80, hint).snap
         assertEquals(snap, snapFrom(snap.toFields()))
+    }
+
+    @Test
+    fun pairingCodesStayWesternDigits() {
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("ar"))
+        try {
+            assertEquals("0042", chooseCode(emptySet()) { 42 })
+            assertEquals("0007", chooseCode(setOf("0042")) { 7 })
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun clockDigitsStayWesternDigits() {
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("ar"))
+        try {
+            assertEquals("1:02:03", clockDigits((3600 + 120 + 3) * 1000L))
+            assertEquals("4:05", clockDigits((4 * 60 + 5) * 1000L))
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun pausedStretchStillBlocksManualOverlap() {
+        val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
+        val armed = arm(Snap(focusMin = 25), "focus", 0L, 0L, hint)
+        val runningNow = 10 * 60_000L
+        assertTrue(overlapsOpen(armed.snap, 10 * 60_000L, 60_000L, runningNow))
+        assertFalse(overlapsOpen(armed.snap, 26 * 60_000L, 60_000L, runningNow))
+        val paused = pauseSnap(armed.snap, 60_000L, 60_000L).snap
+        val now = 2 * 60 * 60_000L
+        assertTrue(overlapsOpen(paused, 30 * 60_000L, 60_000L, now))
+        assertFalse(overlapsOpen(paused, now + 25 * 60_000L, 60_000L, now))
     }
 
     @Test

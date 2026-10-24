@@ -1,5 +1,7 @@
 package app.canto.core
 
+import java.util.Locale
+
 const val KIND_GROUP = "group"
 const val KIND_TAG = "tag"
 const val KIND_PROJECT = "project"
@@ -70,15 +72,17 @@ fun codeStatus(typed: String, offered: String?, offeredUntil: Long, now: Long): 
 fun chooseCode(taken: Set<String>, draw: (Int) -> Int): String? {
     if (taken.size >= 10_000) return null
     repeat(64) {
-        val code = "%04d".format(draw(10_000))
+        val code = fourDigits(draw(10_000))
         if (code !in taken) return code
     }
     for (i in 0..9999) {
-        val code = "%04d".format(i)
+        val code = fourDigits(i)
         if (code !in taken) return code
     }
     return null
 }
+
+private fun fourDigits(value: Int): String = String.format(Locale.ROOT, "%04d", value)
 
 fun rotateCode(current: String?, others: Set<String>, draw: (Int) -> Int): String? {
     if (current != null && current !in others) return current

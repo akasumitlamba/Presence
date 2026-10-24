@@ -2,7 +2,7 @@
 
 Canto is a focus-cycle timer and time tracker for Android. A canto is one section of a long work. Projects, tasks, and sessions stay on the phone. There is no account.
 
-Package: `app.canto`.
+Package: `app.canto`. Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
 ## Install
 
@@ -89,3 +89,9 @@ A narrow window keeps a bottom bar and one column. A landscape phone, a tablet, 
 ## Languages
 
 Settings → Language. The first launch follows the phone when it is Turkish, Spanish, Portuguese, French, Japanese, or Korean. Otherwise it starts in English.
+
+## License
+
+Copyright 2026 Sumit Kumar.
+
+Licensed under the Apache License, Version 2.0. You may obtain a copy of the license in [LICENSE](LICENSE), or at http://www.apache.org/licenses/LICENSE-2.0.

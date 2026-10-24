@@ -1106,7 +1106,7 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
                 val start = day.atTime(dayStart.coerceAtLeast(0), 30).atZone(zone).toInstant().toEpochMilli()
                 when {
                     duration < 60_000L -> onDone(t.atLeast)
-                    overlapsOpen(snap, start, duration) -> onDone(t.overlap)
+                    overlapsOpen(snap, start, duration, System.currentTimeMillis()) -> onDone(t.overlap)
                     else -> {
                 val chosen = projects.find { it.id == project }
                 val group = rows.alive(KIND_GROUP).find { it.id == chosen?.f("groupId") }?.f("name").orEmpty()
