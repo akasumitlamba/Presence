@@ -7,6 +7,7 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
@@ -93,6 +94,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -183,7 +185,10 @@ fun PresenceRoot() {
         else -> 1f
     }
     val density = LocalDensity.current
-    val wide = calculateWindowSizeClass(context as android.app.Activity).widthSizeClass != WindowWidthSizeClass.Compact
+    val configuration = LocalConfiguration.current
+    val tall = configuration.orientation == Configuration.ORIENTATION_PORTRAIT ||
+        configuration.screenHeightDp > configuration.screenWidthDp
+    val wide = !tall && calculateWindowSizeClass(context as android.app.Activity).widthSizeClass != WindowWidthSizeClass.Compact
     androidx.compose.runtime.CompositionLocalProvider(
         LocalDensity provides Density(density.density * scale, density.fontScale * scale),
     ) {
@@ -359,7 +364,7 @@ private fun TimerPage(
     }
     val notificationsOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
     val controls: @Composable () -> Unit = {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (projects.isEmpty()) {
                 Text(t.emptyProjects, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                 PresenceButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.newProject) }
