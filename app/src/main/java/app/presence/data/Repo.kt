@@ -12,9 +12,6 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import app.presence.core.Catalog
-import app.presence.core.GROUP_PERSONAL
-import app.presence.core.GROUP_STUDY
-import app.presence.core.GROUP_WORK
 import app.presence.core.KIND_GROUP
 import app.presence.core.KIND_LOCAL
 import app.presence.core.KIND_PREF
@@ -189,14 +186,9 @@ class Repo(private val context: Context) : Catalog {
                 )
             }
             val writer = deviceIdLocked()
-            if (rows.none { it.kind == KIND_GROUP && it.id == GROUP_WORK }) {
-                dao.upsert(
-                    listOf(
-                        Rec(KIND_GROUP, GROUP_WORK, now, writer, false, mapOf("name" to "Work", "sort" to "0")),
-                        Rec(KIND_GROUP, GROUP_STUDY, now, writer, false, mapOf("name" to "Study", "sort" to "1")),
-                        Rec(KIND_GROUP, GROUP_PERSONAL, now, writer, false, mapOf("name" to "Personal", "sort" to "2")),
-                    ).map { it.toEntity() },
-                )
+            val staleGroups = dao.all().filter { it.kind == KIND_GROUP && !it.deleted }
+            if (staleGroups.isNotEmpty()) {
+                dao.upsert(staleGroups.map { it.copy(deleted = true, updatedAt = now) })
             }
             val have = dao.all().filter { it.kind == KIND_PREF }.map { it.id }.toSet()
             val defaults = mapOf(

@@ -43,6 +43,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -50,23 +51,28 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -108,9 +114,6 @@ import app.presence.timer.Reminders
 import app.presence.widget.HomeWidgets
 import app.presence.core.FREE_PROJECTS
 import app.presence.core.FREE_TASKS
-import app.presence.core.GROUP_PERSONAL
-import app.presence.core.GROUP_STUDY
-import app.presence.core.GROUP_WORK
 import app.presence.core.KIND_GROUP
 import app.presence.core.KIND_LOCAL
 import app.presence.core.KIND_PROJECT
@@ -335,10 +338,10 @@ private fun TimerPage(
 ) {
     val context = LocalContext.current
     val projects = rows.alive(KIND_PROJECT).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
-    val groups = rows.alive(KIND_GROUP).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
     val free = freeProjectIds(rows.alive(KIND_PROJECT))
     var selected by remember { mutableStateOf(snap.projectId) }
     var creating by remember { mutableStateOf(false) }
+    var projectMenu by remember { mutableStateOf(false) }
     var taskId by remember { mutableStateOf(snap.taskId) }
     var pending by remember { mutableStateOf<Rec?>(null) }
     val project = projects.find { it.id == selected }
@@ -365,27 +368,38 @@ private fun TimerPage(
     val notificationsOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
     val controls: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (projects.isEmpty()) {
-                Text(t.emptyProjects, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
-                PresenceButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.newProject) }
-            } else {
-                if (project == null && snap.status == "idle") {
-                    Text(t.chooseProject, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
-                }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = project?.f("name").orEmpty().ifEmpty { t.chooseProject },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(t.projects) },
+                    trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = presenceFieldColors(),
+                )
+                Box(Modifier.matchParentSize().clickable { projectMenu = true })
+                DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
                     projects.forEach { item ->
                         val locked = !premium && item.id !in free
-                        PresenceChip(
-                            selected = item.id == selected,
+                        DropdownMenuItem(
+                            text = { Text(if (locked) item.f("name") + " · " + t.locked else item.f("name")) },
                             onClick = {
+                                projectMenu = false
                                 if (locked) onGate() else {
                                     selected = item.id
                                     taskId = null
                                 }
                             },
-                            label = { Text(if (locked) item.f("name") + " · " + t.locked else item.f("name")) },
                         )
                     }
+                    DropdownMenuItem(
+                        text = { Text(t.newProject) },
+                        onClick = {
+                            projectMenu = false
+                            creating = true
+                        },
+                    )
                 }
             }
             if (tasks.isNotEmpty()) {
@@ -395,43 +409,69 @@ private fun TimerPage(
                     }
                 }
             }
-            if (snap.status == "idle") {
-                Text(t.focusModeHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                Text(t.trackModeHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            }
             val canBegin = project != null
-            PresenceButton(onClick = {
-                when (snap.status) {
-                    "running" -> app.center.pause()
-                    "paused" -> app.center.resume()
-                    "awaiting" -> app.center.start(snap.awaitingKind.ifEmpty { "focus" }, project, task)
-                    else -> {
+            val actionMod = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)
+            if (wide && snap.status == "idle") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    PresenceButton(onClick = {
                         val chosen = project
                         if (chosen != null) {
                             if (!premium && chosen.id !in free) onGate()
                             else app.center.start("focus", chosen, task)
                         }
+                    }, enabled = canBegin, modifier = Modifier.heightIn(min = 56.dp)) { Text(primary) }
+                    Explain(t.focusModeHelp)
+                    TonalButton(onClick = {
+                        val chosen = project
+                        if (chosen != null) {
+                            if (!premium && chosen.id !in free) onGate() else app.center.start("track", chosen, task)
+                        }
+                    }, enabled = canBegin, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.trackTime) }
+                    Explain(t.trackModeHelp)
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    PresenceButton(onClick = {
+                        when (snap.status) {
+                            "running" -> app.center.pause()
+                            "paused" -> app.center.resume()
+                            "awaiting" -> app.center.start(snap.awaitingKind.ifEmpty { "focus" }, project, task)
+                            else -> {
+                                val chosen = project
+                                if (chosen != null) {
+                                    if (!premium && chosen.id !in free) onGate()
+                                    else app.center.start("focus", chosen, task)
+                                }
+                            }
+                        }
+                    }, enabled = snap.status == "running" || snap.status == "paused" || snap.status == "awaiting" || canBegin, modifier = Modifier.weight(1f).heightIn(min = 56.dp)) { Text(primary) }
+                    if (snap.status == "idle") Explain(t.focusModeHelp)
+                }
+                if (snap.status == "idle") {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TonalButton(onClick = {
+                            val chosen = project
+                            if (chosen != null) {
+                                if (!premium && chosen.id !in free) onGate() else app.center.start("track", chosen, task)
+                            }
+                        }, enabled = canBegin, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
+                        Explain(t.trackModeHelp)
                     }
                 }
-            }, enabled = snap.status == "running" || snap.status == "paused" || snap.status == "awaiting" || canBegin, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(primary) }
-            if (snap.status == "idle") {
-                TonalButton(onClick = {
-                    val chosen = project
-                    if (chosen != null) {
-                        if (!premium && chosen.id !in free) onGate() else app.center.start("track", chosen, task)
-                    }
-                }, enabled = canBegin, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.trackTime) }
             }
             if (snap.status == "running" || snap.status == "paused") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TonalButton(onClick = { app.center.stop() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.stop) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TonalButton(onClick = { app.center.stop() }, modifier = actionMod) { Text(t.stop) }
                     if (snap.kind != "track") {
-                        TonalButton(onClick = { app.center.skip() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.skip) }
+                        TonalButton(onClick = { app.center.skip() }, modifier = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.skip) }
+                        Explain(t.skipHelp)
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TonalButton(onClick = { app.center.beginRest("short") }, enabled = snap.kind != "short", modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.startShort) }
-                    TonalButton(onClick = { app.center.beginRest("long") }, enabled = snap.kind != "long", modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.startLong) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TonalButton(onClick = { app.center.beginRest("short") }, enabled = snap.kind != "short", modifier = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.startShort) }
+                    Explain(t.shortNowHelp)
+                    TonalButton(onClick = { app.center.beginRest("long") }, enabled = snap.kind != "long", modifier = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.startLong) }
+                    Explain(t.longNowHelp)
                 }
             }
             if (snap.status == "running" || snap.status == "paused" || snap.status == "awaiting") {
@@ -476,31 +516,10 @@ private fun TimerPage(
         }, { pending = null })
     }
     if (creating) {
-        ProjectDialog(t, groups, { creating = false }) { name, color, groupId ->
+        NameDialog(t.newProject, "", t, { creating = false }) { name ->
             creating = false
-            val id = UUID.randomUUID().toString()
-            app.repo.put(
-                app.repo.writerNow(
-                    KIND_PROJECT,
-                    id,
-                    mapOf(
-                        "name" to name,
-                        "color" to color,
-                        "groupId" to groupId,
-                        "goalMinutes" to "",
-                        "goalDeadline" to "",
-                        "focus" to "",
-                        "short" to "",
-                        "long" to "",
-                        "cycles" to "",
-                        "countUp" to "",
-                        "sort" to ((projects.maxOfOrNull { it.f("sort").toIntOrNull() ?: 0 } ?: 0) + 1).toString(),
-                        "tags" to "",
-                        "createdAt" to System.currentTimeMillis().toString(),
-                    ),
-                ),
-            )
-            selected = id
+            selected = addProject(app, projects, name)
+            taskId = null
         }
     }
 }
@@ -521,15 +540,12 @@ private fun ProjectsPage(
     val dayStart = app.repo.globals().dayStart
     val today = dayKey(System.currentTimeMillis(), zone, dayStart)
     val projects = rows.alive(KIND_PROJECT).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
-    val groups = rows.alive(KIND_GROUP).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
     val tags = rows.alive(KIND_TAG)
     val free = freeProjectIds(projects)
     var filter by remember { mutableStateOf<String?>(null) }
     var menuFor by remember { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<Rec?>(null) }
-    var renameGroup by remember { mutableStateOf<Rec?>(null) }
-    var newGroup by remember { mutableStateOf(false) }
     var pendingPlay by remember { mutableStateOf<Rec?>(null) }
     val visible = projects.filter { filter == null || it.f("tags").split(",").contains(filter) }
     val list: @Composable (Modifier) -> Unit = { modifier ->
@@ -544,68 +560,54 @@ private fun ProjectsPage(
             }
             if (visible.isEmpty()) {
                 Text(t.emptyProjects, style = MaterialTheme.typography.titleLarge)
-                PresenceButton(onClick = {
-                    if (!premium && projects.size >= FREE_PROJECTS) onGate() else creating = true
-                }) { Text(t.newProject) }
             }
-            groups.forEach { group ->
-                val mine = visible.filter { it.f("groupId") == group.id }
-                if (mine.isEmpty() && filter != null) return@forEach
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(group.f("name"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { renameGroup = group }) { Text(t.rename) }
-                    if (group.id != GROUP_WORK && group.id != GROUP_STUDY && group.id != GROUP_PERSONAL) {
-                        TextButton(onClick = { confirmDelete = group }) { Text(t.delete) }
-                    }
+            visible.forEach { project ->
+                val locked = !premium && project.id !in free
+                val todayMs = rows.filter { it.kind == KIND_SESSION && it.f("projectId") == project.id }.sumOf { rec ->
+                    val start = rec.f("startedAt").toLongOrNull() ?: return@sumOf 0L
+                    if (dayKey(start, zone, dayStart) != today) 0L else sessionCountedMillis(rec)
                 }
-                mine.forEach { project ->
-                    val locked = !premium && project.id !in free
-                    val todayMs = rows.filter { it.kind == KIND_SESSION && it.f("projectId") == project.id }.sumOf { rec ->
-                        val start = rec.f("startedAt").toLongOrNull() ?: return@sumOf 0L
-                        if (dayKey(start, zone, dayStart) != today) 0L else sessionCountedMillis(rec)
-                    }
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.fillMaxWidth().combinedClickable(
-                            onClick = { onSelect(project.id) },
-                            onLongClick = { menuFor = project.id },
-                        ),
-                    ) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(18.dp).clip(CircleShape).background(colorOf(project.f("color"))))
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(project.f("name"), style = MaterialTheme.typography.titleMedium)
-                                Text(if (locked) t.locked else clockWords(todayMs), style = MaterialTheme.typography.bodyMedium)
-                            }
-                            TextButton(onClick = {
-                                if (locked) onGate() else {
-                                    val snap = app.center.snap()
-                                    if ((snap.status == "running" || snap.status == "paused") && !(snap.kind == "track" && snap.projectId == project.id)) {
-                                        pendingPlay = project
-                                    } else if (snap.kind == "track" && snap.projectId == project.id && (snap.status == "running" || snap.status == "paused")) {
-                                        app.center.stop()
-                                    } else {
-                                        app.center.start("track", project, null)
-                                    }
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth().combinedClickable(
+                        onClick = { onSelect(project.id) },
+                        onLongClick = { menuFor = project.id },
+                    ),
+                ) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(18.dp).clip(CircleShape).background(colorOf(project.f("color"))))
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(project.f("name"), style = MaterialTheme.typography.titleMedium)
+                            Text(if (locked) t.locked else clockWords(todayMs), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        TextButton(onClick = {
+                            if (locked) onGate() else {
+                                val snap = app.center.snap()
+                                if ((snap.status == "running" || snap.status == "paused") && !(snap.kind == "track" && snap.projectId == project.id)) {
+                                    pendingPlay = project
+                                } else if (snap.kind == "track" && snap.projectId == project.id && (snap.status == "running" || snap.status == "paused")) {
+                                    app.center.stop()
+                                } else {
+                                    app.center.start("track", project, null)
                                 }
-                            }) { Text(if (app.center.snap().projectId == project.id && app.center.snap().kind == "track" && app.center.snap().status != "idle") t.stop else t.track) }
-                            DropdownMenu(expanded = menuFor == project.id, onDismissRequest = { menuFor = null }) {
-                                DropdownMenuItem(text = { Text(t.moveUp) }, onClick = { menuFor = null; move(app, projects, project, -1) })
-                                DropdownMenuItem(text = { Text(t.moveDown) }, onClick = { menuFor = null; move(app, projects, project, 1) })
-                                DropdownMenuItem(text = { Text(t.delete) }, onClick = { menuFor = null; confirmDelete = project })
                             }
+                        }) { Text(if (app.center.snap().projectId == project.id && app.center.snap().kind == "track" && app.center.snap().status != "idle") t.stop else t.track) }
+                        TextButton(onClick = { confirmDelete = project }) { Text(t.delete) }
+                        DropdownMenu(expanded = menuFor == project.id, onDismissRequest = { menuFor = null }) {
+                            DropdownMenuItem(text = { Text(t.moveUp) }, onClick = { menuFor = null; move(app, projects, project, -1) })
+                            DropdownMenuItem(text = { Text(t.moveDown) }, onClick = { menuFor = null; move(app, projects, project, 1) })
+                            DropdownMenuItem(text = { Text(t.delete) }, onClick = { menuFor = null; confirmDelete = project })
                         }
                     }
                 }
             }
             PresenceButton(onClick = {
                 if (!premium && projects.size >= FREE_PROJECTS) onGate() else creating = true
-            }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.newProject) }
-            TextButton(onClick = { if (premium) newGroup = true else onGate() }) { Text(t.newGroup) }
+            }, modifier = Modifier.heightIn(min = 52.dp)) { Text(t.newProject) }
         }
     }
     val detail: @Composable (Modifier) -> Unit = { modifier ->
@@ -629,78 +631,28 @@ private fun ProjectsPage(
             detail(Modifier.weight(1f))
         }
     }
-    if (creating) ProjectDialog(t, groups, { creating = false }) { name, color, groupId ->
-        creating = false
-        val id = UUID.randomUUID().toString()
-        app.repo.put(
-            app.repo.writerNow(
-                KIND_PROJECT,
-                id,
-                mapOf(
-                    "name" to name,
-                    "color" to color,
-                    "groupId" to groupId,
-                    "goalMinutes" to "",
-                    "goalDeadline" to "",
-                    "focus" to "",
-                    "short" to "",
-                    "long" to "",
-                    "cycles" to "",
-                    "countUp" to "",
-                    "sort" to ((projects.maxOfOrNull { it.f("sort").toIntOrNull() ?: 0 } ?: 0) + 1).toString(),
-                    "tags" to "",
-                    "createdAt" to System.currentTimeMillis().toString(),
-                ),
-            ),
-        )
-        onSelect(id)
+    if (creating) {
+        NameDialog(t.newProject, "", t, { creating = false }) { name ->
+            creating = false
+            onSelect(addProject(app, projects, name))
+        }
     }
     confirmDelete?.let { item ->
-        val project = item.kind == KIND_PROJECT
         Confirm(
-            if (project) t.deleteProject else t.deleteGroup,
-            if (project) t.deleteProjectBody else t.deleteGroupBody,
+            t.deleteProject,
+            t.deleteProjectBody,
             t.delete,
             t.cancel,
             {
-                if (project) {
-                    app.repo.put(item.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId()))
-                    rows.alive(KIND_TASK).filter { it.f("projectId") == item.id }.forEach {
-                        app.repo.put(it.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId()))
-                    }
-                    if (selectedId == item.id) onSelect(null)
-                } else {
-                    projects.filter { it.f("groupId") == item.id }.forEach {
-                        val body = it.body.toMutableMap()
-                        body["groupId"] = GROUP_PERSONAL
-                        app.repo.put(it.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
-                    }
-                    app.repo.put(item.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId()))
+                app.repo.put(item.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId()))
+                rows.alive(KIND_TASK).filter { it.f("projectId") == item.id }.forEach {
+                    app.repo.put(it.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId()))
                 }
+                if (selectedId == item.id) onSelect(null)
                 confirmDelete = null
             },
             { confirmDelete = null },
         )
-    }
-    if (newGroup) {
-        NameDialog(t.newGroup, "", t, { newGroup = false }) { name ->
-            newGroup = false
-            app.repo.put(
-                app.repo.writerNow(
-                    KIND_GROUP,
-                    UUID.randomUUID().toString(),
-                    mapOf("name" to name, "sort" to "9"),
-                ),
-            )
-        }
-    }
-    renameGroup?.let { group ->
-        NameDialog(t.rename, group.f("name"), t, { renameGroup = null }) { name ->
-            val body = group.body.toMutableMap()
-            body["name"] = name
-            app.repo.put(group.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
-            renameGroup = null
-        }
     }
     pendingPlay?.let { project ->
         Confirm(t.switchTitle, t.switchBody, t.save, t.cancel, {
@@ -709,6 +661,33 @@ private fun ProjectsPage(
             app.center.start("track", project, null)
         }, { pendingPlay = null })
     }
+}
+
+private fun addProject(app: PresenceApp, projects: List<Rec>, name: String): String {
+    val id = UUID.randomUUID().toString()
+    val color = "%06X".format(Swatches[projects.size % Swatches.size])
+    app.repo.put(
+        app.repo.writerNow(
+            KIND_PROJECT,
+            id,
+            mapOf(
+                "name" to name,
+                "color" to color,
+                "groupId" to "",
+                "goalMinutes" to "",
+                "goalDeadline" to "",
+                "focus" to "",
+                "short" to "",
+                "long" to "",
+                "cycles" to "",
+                "countUp" to "",
+                "sort" to ((projects.maxOfOrNull { it.f("sort").toIntOrNull() ?: 0 } ?: 0) + 1).toString(),
+                "tags" to "",
+                "createdAt" to System.currentTimeMillis().toString(),
+            ),
+        ),
+    )
+    return id
 }
 
 private fun move(app: PresenceApp, projects: List<Rec>, project: Rec, direction: Int) {
@@ -903,6 +882,7 @@ private fun OwnTimer(t: T, project: Rec, onSave: (Map<String, String>) -> Unit) 
         NumberRow(t.cycles, cycles) { cycles = it }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(t.countUp, modifier = Modifier.weight(1f))
+            Explain(t.countUpHelp)
             PresenceSwitch(checked = up, onCheckedChange = { up = it })
         }
         PresenceButton(onClick = {
@@ -1085,11 +1065,20 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it })
         }
         if (premium) {
-            PresenceButton(onClick = { share() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.share) }
             val logicalToday = today
-            PresenceButton(onClick = {
-                if (selectedDay > logicalToday) note = t.future else manual = true
-            }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.manual) }
+            if (wide) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    PresenceButton(onClick = { share() }, modifier = Modifier.heightIn(min = 52.dp)) { Text(t.share) }
+                    PresenceButton(onClick = {
+                        if (selectedDay > logicalToday) note = t.future else manual = true
+                    }, modifier = Modifier.heightIn(min = 52.dp)) { Text(t.manual) }
+                }
+            } else {
+                PresenceButton(onClick = { share() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.share) }
+                PresenceButton(onClick = {
+                    if (selectedDay > logicalToday) note = t.future else manual = true
+                }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.manual) }
+            }
         }
         if (note.isNotEmpty()) Text(note)
         rows.alive(KIND_SESSION).filter {
@@ -1297,39 +1286,6 @@ private fun TodosPage(app: PresenceApp, t: T, rows: List<Rec>, wide: Boolean) {
 }
 
 @Composable
-private fun ChoiceRow(title: String, help: String, selected: Boolean, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val background = if (selected) scheme.primaryContainer else scheme.surface
-    val ink = if (selected) scheme.onPrimaryContainer else scheme.onSurface
-    val helpInk = if (selected) scheme.onPrimaryContainer else scheme.onSurfaceVariant
-    Surface(
-        color = background,
-        contentColor = ink,
-        border = BorderStroke(1.dp, scheme.outline),
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-    ) {
-        Row(
-            Modifier.padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(
-                selected = selected,
-                onClick = onClick,
-                colors = RadioButtonDefaults.colors(
-                    selectedColor = scheme.onPrimaryContainer,
-                    unselectedColor = scheme.outline,
-                ),
-            )
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, color = ink, style = MaterialTheme.typography.titleMedium)
-                Text(help, color = helpInk, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-    }
-}
-
-@Composable
 private fun ReminderRow(
     title: String,
     help: String,
@@ -1350,10 +1306,8 @@ private fun ReminderRow(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(title, color = scheme.onSurface, style = MaterialTheme.typography.titleMedium)
-                    Text(help, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                }
+                Text(title, modifier = Modifier.weight(1f), color = scheme.onSurface, style = MaterialTheme.typography.titleMedium)
+                Explain(help)
                 PresenceSwitch(checked = on, onCheckedChange = onToggle)
             }
             Surface(
@@ -1441,27 +1395,31 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
         }
         Text(storageBody, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
         if (storage.cardPresent && !storage.onCard && !storage.cardMissing) {
-            Text(t.sdMoveHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            PresenceButton(onClick = {
-                note = when (app.repo.moveToSd()) {
-                    "moved" -> t.sdOnCard
-                    "no-card" -> t.sdNone
-                    "missing" -> t.sdMissing
-                    else -> t.sdFailed
-                }
-            }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.sdMove) }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PresenceButton(onClick = {
+                    note = when (app.repo.moveToSd()) {
+                        "moved" -> t.sdOnCard
+                        "no-card" -> t.sdNone
+                        "missing" -> t.sdMissing
+                        else -> t.sdFailed
+                    }
+                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdMove) }
+                Explain(t.sdMoveHelp)
+            }
         }
         if (storage.onCard && storage.cardPresent) {
-            Text(t.sdInternalHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            PresenceButton(onClick = {
-                note = when (app.repo.moveToInternal()) {
-                    "moved" -> t.sdPresent
-                    else -> t.sdFailed
-                }
-            }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.sdInternal) }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PresenceButton(onClick = {
+                    note = when (app.repo.moveToInternal()) {
+                        "moved" -> t.sdPresent
+                        else -> t.sdFailed
+                    }
+                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdInternal) }
+                Explain(t.sdInternalHelp)
+            }
         }
         if (storage.cardMissing) {
-            PresenceButton(onClick = { app.repo.refreshStorage() }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.sdCheck) }
+            PresenceButton(onClick = { app.repo.refreshStorage() }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdCheck) }
         }
     }
     val timerPane: @Composable () -> Unit = {
@@ -1498,63 +1456,89 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
                 app.center.refreshSettings()
                 Reminders.reschedule(context)
                 note = t.resetDone
-            }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.resetSettings) }
+            }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.resetSettings) }
         }
     }
     val otherPane: @Composable () -> Unit = {
-        Text(t.appearance, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        ChoiceRow(t.light, t.lightHelp, theme == "light") { app.repo.updateFlags { it["theme"] = "light" } }
-        ChoiceRow(t.dark, t.darkHelp, theme == "dark") { app.repo.updateFlags { it["theme"] = "dark" } }
-        ChoiceRow(t.followSystem, t.followHelp, theme == "system") { app.repo.updateFlags { it["theme"] = "system" } }
-        Text(t.colorTheme, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        ChoiceRow(t.paletteGrove, t.paletteGroveHelp, palette == "grove") { app.repo.updateFlags { it["palette"] = "grove" } }
-        ChoiceRow(t.paletteHarbor, t.paletteHarborHelp, palette == "harbor") { app.repo.updateFlags { it["palette"] = "harbor" } }
-        ChoiceRow(t.paletteDusk, t.paletteDuskHelp, palette == "dusk") { app.repo.updateFlags { it["palette"] = "dusk" } }
-        ChoiceRow(t.paletteSlate, t.paletteSlateHelp, palette == "slate") { app.repo.updateFlags { it["palette"] = "slate" } }
-        ChoiceRow(t.paletteBerry, t.paletteBerryHelp, palette == "berry") { app.repo.updateFlags { it["palette"] = "berry" } }
-        Text(t.textSize, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        ChoiceRow(t.compact, t.compactHelp, textSize == "compact") { app.repo.updateFlags { it["text"] = "compact" } }
-        ChoiceRow(t.standard, t.standardHelp, textSize == "standard") { app.repo.updateFlags { it["text"] = "standard" } }
-        ChoiceRow(t.large, t.largeHelp, textSize == "large") { app.repo.updateFlags { it["text"] = "large" } }
-        Text(t.language, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        listOf(
-            "system" to (t.system to t.langSystemHelp),
-            "en" to (t.langEnglish to t.langEnHelp),
-            "tr" to (t.langTurkish to t.langTrHelp),
-            "es" to (t.langSpanish to t.langEsHelp),
-            "pt" to (t.langPortuguese to t.langPtHelp),
-            "fr" to (t.langFrench to t.langFrHelp),
-            "ja" to (t.langJapanese to t.langJaHelp),
-            "ko" to (t.langKorean to t.langKoHelp),
-        ).forEach { (id, copy) ->
-            ChoiceRow(copy.first, copy.second, language == id) { app.repo.updateFlags { it["language"] = id } }
+        val themeLabel = when (theme) {
+            "light" -> t.light
+            "dark" -> t.dark
+            else -> t.followSystem
+        }
+        MenuField(t.appearance, t.themeMenuHelp, themeLabel, listOf("light" to t.light, "dark" to t.dark, "system" to t.followSystem)) {
+            app.repo.updateFlags { flags -> flags["theme"] = it }
+        }
+        val paletteNames = listOf(
+            "grove" to t.paletteGrove,
+            "harbor" to t.paletteHarbor,
+            "dusk" to t.paletteDusk,
+            "slate" to t.paletteSlate,
+            "berry" to t.paletteBerry,
+            "amber" to t.paletteAmber,
+            "moss" to t.paletteMoss,
+            "iris" to t.paletteIris,
+            "copper" to t.paletteCopper,
+            "tide" to t.paletteTide,
+            "ink" to t.paletteInk,
+        )
+        MenuField(t.colorTheme, t.paletteMenuHelp, paletteNames.find { it.first == palette }?.second ?: t.paletteGrove, paletteNames) {
+            app.repo.updateFlags { flags -> flags["palette"] = it }
+        }
+        val textLabel = when (textSize) {
+            "compact" -> t.compact
+            "large" -> t.large
+            else -> t.standard
+        }
+        MenuField(t.textSize, t.textMenuHelp, textLabel, listOf("compact" to t.compact, "standard" to t.standard, "large" to t.large)) {
+            app.repo.updateFlags { flags -> flags["text"] = it }
+        }
+        val languages = listOf(
+            "system" to t.system,
+            "en" to t.langEnglish,
+            "tr" to t.langTurkish,
+            "es" to t.langSpanish,
+            "pt" to t.langPortuguese,
+            "fr" to t.langFrench,
+            "ja" to t.langJapanese,
+            "ko" to t.langKorean,
+        )
+        MenuField(t.language, t.languageMenuHelp, languages.find { it.first == language }?.second ?: t.system, languages) {
+            app.repo.updateFlags { flags -> flags["language"] = it }
         }
         Text(t.sounds, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        Text(t.alarm, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-        ChoiceRow(t.chime, t.chimeHelp, globals.alarm == "chime") { app.repo.setPref("alarm", "chime") }
-        ChoiceRow(t.bell, t.bellHelp, globals.alarm == "bell") { app.repo.setPref("alarm", "bell") }
-        ChoiceRow(t.pulse, t.pulseHelp, globals.alarm == "pulse") { app.repo.setPref("alarm", "pulse") }
-        ChoiceRow(t.custom, t.customHelp, globals.alarm == "custom") { sound.launch(arrayOf("audio/*")) }
-        Text(t.background, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-        ChoiceRow(t.off, t.offHelp, globals.background == "off") { app.repo.setPref("background", "off") }
-        ChoiceRow(t.rain, t.rainHelp, globals.background == "rain") { app.repo.setPref("background", "rain") }
-        ChoiceRow(t.brook, t.brookHelp, globals.background == "brook") { app.repo.setPref("background", "brook") }
-        ChoiceRow(t.hearth, t.hearthHelp, globals.background == "hearth") { app.repo.setPref("background", "hearth") }
+        val alarmLabel = when (globals.alarm) {
+            "bell" -> t.bell
+            "pulse" -> t.pulse
+            "custom" -> t.custom
+            else -> t.chime
+        }
+        MenuField(t.alarm, t.alarmMenuHelp, alarmLabel, listOf("chime" to t.chime, "bell" to t.bell, "pulse" to t.pulse, "custom" to t.custom)) {
+            if (it == "custom") sound.launch(arrayOf("audio/*")) else app.repo.setPref("alarm", it)
+        }
+        val backgroundLabel = when (globals.background) {
+            "rain" -> t.rain
+            "brook" -> t.brook
+            "hearth" -> t.hearth
+            else -> t.off
+        }
+        MenuField(t.background, t.backgroundMenuHelp, backgroundLabel, listOf("off" to t.off, "rain" to t.rain, "brook" to t.brook, "hearth" to t.hearth)) {
+            app.repo.setPref("background", it)
+        }
         Stepper(t, t.volume, t.volumeHelp, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()) }
         Text(t.data, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         Setting(t.exportJson, t.exportJsonHelp) {
-            PresenceButton(onClick = { exportJson.launch("presence-backup.json") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportJson) }
+            PresenceButton(onClick = { exportJson.launch("presence-backup.json") }) { Text(t.exportJson) }
         }
         Setting(t.exportCsv, t.exportCsvHelp) {
-            PresenceButton(onClick = { exportCsv.launch("presence-sessions.csv") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportCsv) }
+            PresenceButton(onClick = { exportCsv.launch("presence-sessions.csv") }) { Text(t.exportCsv) }
         }
         Setting(t.importJson, t.importHelp) {
-            PresenceButton(onClick = { importJson.launch(arrayOf("application/json", "text/*", "*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(t.importJson) }
+            PresenceButton(onClick = { importJson.launch(arrayOf("application/json", "text/*", "*/*")) }) { Text(t.importJson) }
         }
         if (note.isNotEmpty()) Text(note, color = MaterialTheme.colorScheme.onSurface)
         Text(t.devices, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         Setting(t.pair, t.pairHelp) {
-            PresenceButton(onClick = onPair, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pair) }
+            PresenceButton(onClick = onPair, modifier = Modifier.heightIn(min = 52.dp)) { Text(t.pair) }
         }
         Text(t.about, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         Text(t.aboutBody, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
@@ -1585,26 +1569,82 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Explain(text: String) {
+    val state = rememberTooltipState(isPersistent = true)
+    val scope = rememberCoroutineScope()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(text) } },
+        state = state,
+        enableUserInput = false,
+    ) {
+        IconButton(
+            onClick = { scope.launch { state.show() } },
+            modifier = Modifier.size(40.dp),
+        ) {
+            Icon(
+                Icons.Filled.Visibility,
+                contentDescription = text,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MenuField(
+    title: String,
+    help: String,
+    value: String,
+    options: List<Pair<String, String>>,
+    onPick: (String) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+            Explain(help)
+        }
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = presenceFieldColors(),
+            )
+            Box(Modifier.matchParentSize().clickable { open = true })
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                options.forEach { (id, label) ->
+                    DropdownMenuItem(text = { Text(label) }, onClick = { open = false; onPick(id) })
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun Setting(title: String, help: String, control: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(4.dp))
-        Text(help, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(8.dp))
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(title, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+        Explain(help)
         control()
     }
 }
 
 @Composable
 private fun SwitchSetting(title: String, help: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
-            Text(help, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        }
-        Spacer(Modifier.width(16.dp))
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+        Explain(help)
         PresenceSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
@@ -1649,16 +1689,20 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
         if (now < 0) return@Column
         PresenceButton(onClick = { withLink { app.lan.showCode() } }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(t.showCode) }
         if (offer != null) {
-            Text(offer!!, style = MaterialTheme.typography.displayLarge, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(offer!!, style = MaterialTheme.typography.displayLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Explain(t.offerHelp)
+            }
             Text(t.expiresIn(clockDigits(leftMs)), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-            Text(t.offerHelp)
             TextButton(onClick = { app.lan.hideCode() }) { Text(t.cancel) }
         } else if (message == "expired") {
             Text(t.expired)
             PresenceButton(onClick = { withLink { app.lan.showCode() } }) { Text(t.newCode) }
         }
-        Text(t.enterHelp)
-        OutlinedTextField(digits, { if (it.length <= 4 && it.all { ch -> ch.isDigit() }) digits = it }, label = { Text(t.enterCode) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(digits, { if (it.length <= 4 && it.all { ch -> ch.isDigit() }) digits = it }, label = { Text(t.enterCode) }, modifier = Modifier.weight(1f), colors = presenceFieldColors())
+            Explain(t.enterHelp)
+        }
         PresenceButton(onClick = { withLink { app.lan.enter(digits) } }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pairAction) }
         if (message.isNotEmpty() && message != "expired") Text(t.pairMessage(message))
         Text(t.devices, style = MaterialTheme.typography.titleLarge)
@@ -1680,11 +1724,11 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
 
 @Composable
 private fun Stepper(t: T, title: String, help: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(4.dp))
-        Text(help, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(8.dp))
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+            Explain(help)
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TonalButton(
                 onClick = { if (value > min) onChange(value - 1) },
@@ -1826,46 +1870,6 @@ private fun NameDialog(title: String, initial: String, t: T, onClose: () -> Unit
         },
         confirmButton = {
             TextButton(onClick = { if (name.isBlank()) error = true else onSave(name.trim()) }) { Text(t.save) }
-        },
-        dismissButton = { TextButton(onClick = onClose) { Text(t.cancel) } },
-    )
-}
-
-@Composable
-private fun ProjectDialog(
-    t: T,
-    groups: List<Rec>,
-    onClose: () -> Unit,
-    onSave: (String, String, String) -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var color by remember { mutableStateOf("1F6F54") }
-    var group by remember { mutableStateOf(groups.firstOrNull()?.id ?: GROUP_PERSONAL) }
-    var error by remember { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onClose,
-        title = { Text(t.newProject) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it; error = false }, label = { Text(t.name) }, colors = presenceFieldColors())
-                if (error) Text(t.giveName)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Swatches.forEach { swatch ->
-                        val hex = "%06X".format(swatch)
-                        Box(
-                            Modifier.size(32.dp).clip(CircleShape).background(colorOf(hex)).clickable { color = hex },
-                        )
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    groups.forEach { item ->
-                        PresenceChip(selected = group == item.id, onClick = { group = item.id }, label = { Text(item.f("name")) })
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { if (name.isBlank()) error = true else onSave(name.trim(), color, group) }) { Text(t.save) }
         },
         dismissButton = { TextButton(onClick = onClose) { Text(t.cancel) } },
     )
