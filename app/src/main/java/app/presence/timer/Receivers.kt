@@ -44,6 +44,7 @@ class BootReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as PresenceApp
                 runBlocking { app.ready.await() }
                 app.center.catchUp()
+                Reminders.reschedule(app)
                 ContextCompat.startForegroundService(
                     context,
                     Intent(context, TimerService::class.java).setAction(TimerService.CATCHUP),

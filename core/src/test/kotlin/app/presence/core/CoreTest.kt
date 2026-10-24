@@ -83,6 +83,27 @@ class CoreTest {
     }
 
     @Test
+    fun streakCountsClosedDaysAndSkipsAGap() {
+        val day = LocalDate.of(2026, 10, 23)
+        fun kept(date: LocalDate) = manualSession(
+            date.toString(), "phone", "p", "Read", "Personal", "focus",
+            date.atTime(10, 0).atZone(zone).toInstant().toEpochMilli(),
+            60_000,
+            date.atTime(11, 0).atZone(zone).toInstant().toEpochMilli(),
+        )
+        val now = day.atTime(18, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals(3, streakDays(listOf(kept(day), kept(day.minusDays(1)), kept(day.minusDays(2))), now, zone, 0))
+        assertEquals(2, streakDays(listOf(kept(day.minusDays(1)), kept(day.minusDays(2))), now, zone, 0))
+        assertEquals(0, streakDays(listOf(kept(day.minusDays(2))), now, zone, 0))
+        assertTrue(loggedToday(listOf(kept(day)), now, zone, 0))
+        val morning = day.atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
+        val next = nextClockMillis(9, 30, morning, zone)
+        assertEquals(day.atTime(9, 30).atZone(zone).toInstant().toEpochMilli(), next)
+        val evening = day.atTime(21, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals(day.plusDays(1).atTime(9, 30).atZone(zone).toInstant().toEpochMilli(), nextClockMillis(9, 30, evening, zone))
+    }
+
+    @Test
     fun dayStartsAtTwoInTheMorning() {
         val oneThirty = ZonedDateTime.of(2026, 10, 23, 1, 30, 0, 0, zone).toInstant().toEpochMilli()
         assertEquals(LocalDate.of(2026, 10, 22), dayKey(oneThirty, zone, 2))

@@ -86,7 +86,15 @@ data class Globals(
     val alarm: String,
     val background: String,
     val volume: Int,
+    val dailyOn: Boolean,
+    val dailyHour: Int,
+    val dailyMinute: Int,
+    val streakOn: Boolean,
+    val streakHour: Int,
+    val streakMinute: Int,
 )
+
+data class Todo(val id: String, val title: String, val done: Boolean, val sort: Long)
 
 class Repo(private val context: Context) : Catalog {
     private val db = Room.databaseBuilder(context.applicationContext, PresenceDb::class.java, "presence.db")
@@ -131,6 +139,12 @@ class Repo(private val context: Context) : Catalog {
                 "alarm" to "chime",
                 "background" to "off",
                 "bg_volume" to "40",
+                "daily_on" to "0",
+                "daily_hour" to "9",
+                "daily_minute" to "0",
+                "streak_on" to "0",
+                "streak_hour" to "20",
+                "streak_minute" to "0",
             )
             val missing = defaults.filterKeys { it !in have }.map { (key, value) ->
                 Rec(KIND_PREF, key, now, writer, false, mapOf("value" to value)).toEntity()
@@ -271,9 +285,45 @@ class Repo(private val context: Context) : Catalog {
         }
     }
 
-    fun premium(): Boolean = flags()["premium"] == "1"
+    fun premium(): Boolean = true
 
-    fun setPremium(on: Boolean) = updateFlags { it["premium"] = if (on) "1" else "0" }
+    fun todos(): List<Todo> = synchronized(lock) {
+        dao.all().map { it.toRec() }
+            .filter { it.kind == KIND_LOCAL && it.id.startsWith("todo:") && !it.deleted }
+            .map {
+                Todo(
+                    id = it.id.removePrefix("todo:"),
+                    title = it.f("title"),
+                    done = it.f("done") == "1",
+                    sort = it.f("sort").toLongOrNull() ?: it.updatedAt,
+                )
+            }
+            .sortedBy { it.sort }
+    }
+
+    fun addTodo(title: String) {
+        val clean = title.trim()
+        if (clean.isEmpty()) return
+        val id = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        put(Rec(KIND_LOCAL, "todo:$id", now, deviceId(), false, mapOf("title" to clean, "done" to "0", "sort" to now.toString())))
+    }
+
+    fun setTodoDone(id: String, done: Boolean) {
+        synchronized(lock) {
+            val row = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "todo:$id" }?.toRec() ?: return
+            val body = row.body.toMutableMap()
+            body["done"] = if (done) "1" else "0"
+            dao.upsert(listOf(row.copy(updatedAt = System.currentTimeMillis(), writerId = deviceIdLocked(), body = body).toEntity()))
+        }
+    }
+
+    fun deleteTodo(id: String) {
+        synchronized(lock) {
+            val row = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "todo:$id" }?.toRec() ?: return
+            dao.upsert(listOf(row.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = deviceIdLocked()).toEntity()))
+        }
+    }
 
     fun globals(): Globals = synchronized(lock) {
         val prefs = dao.all().filter { it.kind == KIND_PREF }.associate { it.id to it.toRec().f("value") }
@@ -289,6 +339,12 @@ class Repo(private val context: Context) : Catalog {
             alarm = prefs["alarm"] ?: "chime",
             background = prefs["background"] ?: "off",
             volume = n("bg_volume", 40).coerceIn(0, 100),
+            dailyOn = prefs["daily_on"] == "1",
+            dailyHour = n("daily_hour", 9).coerceIn(0, 23),
+            dailyMinute = n("daily_minute", 0).coerceIn(0, 59),
+            streakOn = prefs["streak_on"] == "1",
+            streakHour = n("streak_hour", 20).coerceIn(0, 23),
+            streakMinute = n("streak_minute", 0).coerceIn(0, 59),
         )
     }
 

@@ -31,8 +31,10 @@ class Notifier(private val context: Context) {
         val done = NotificationChannel(DONE, "Focus finished", NotificationManager.IMPORTANCE_HIGH).apply {
             setSound(null, null)
         }
+        val remind = NotificationChannel(REMIND, "Reminders", NotificationManager.IMPORTANCE_HIGH)
         manager.createNotificationChannel(ongoing)
         manager.createNotificationChannel(done)
+        manager.createNotificationChannel(remind)
     }
 
     fun ongoing(snap: Snap, force: Boolean = false): Notification {
@@ -161,6 +163,7 @@ class Notifier(private val context: Context) {
     companion object {
         const val ONGOING = "presence.ongoing"
         const val DONE = "presence.done"
+        const val REMIND = "presence.remind"
         const val ONGOING_ID = 7
         const val DONE_ID = 8
     }

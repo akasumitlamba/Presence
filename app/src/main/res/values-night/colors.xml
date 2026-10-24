@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="paper">#121816</color>
+    <color name="ink">#F3F6F4</color>
+    <color name="widget_bg">#121816</color>
+    <color name="widget_ink">#F3F6F4</color>
+    <color name="widget_muted">#C9D9D1</color>
+    <color name="widget_accent">#9EE0C0</color>
+    <color name="widget_on_accent">#062018</color>
+</resources>

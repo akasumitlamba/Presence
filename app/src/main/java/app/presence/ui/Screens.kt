@@ -4,6 +4,7 @@ package app.presence.ui
 
 import android.Manifest
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -39,6 +40,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
@@ -57,6 +60,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -80,7 +84,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -90,7 +93,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import app.presence.MainActivity
 import app.presence.PresenceApp
+import app.presence.timer.Reminders
+import app.presence.widget.HomeWidgets
 import app.presence.core.FREE_PROJECTS
 import app.presence.core.FREE_TASKS
 import app.presence.core.GROUP_PERSONAL
@@ -155,7 +161,7 @@ fun PresenceRoot() {
     val rows by app.repo.observe().collectAsState(initial = emptyList())
     val flags = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.body.orEmpty()
     val t = remember(flags["language"]) { T(resolveLang(flags["language"] ?: "system")) }
-    val premium = flags["premium"] == "1"
+    val premium = true
     val dark = when (flags["theme"]) {
         "dark" -> true
         "light" -> false
@@ -183,7 +189,15 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     var tab by remember { mutableStateOf("timer") }
     var projectId by remember { mutableStateOf<String?>(null) }
     var pairing by remember { mutableStateOf(false) }
-    var gate by remember { mutableStateOf(false) }
+    val activity = context as? MainActivity
+    val requested = activity?.requestedTab
+    LaunchedEffect(requested) {
+        if (!requested.isNullOrEmpty()) {
+            tab = requested
+            pairing = false
+            activity?.requestedTab = null
+        }
+    }
     var tick by remember { mutableIntStateOf(0) }
     val snap = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "snapshot" && !it.deleted }?.let { snapFrom(it.body) } ?: Snap()
     LaunchedEffect(snap.status, snap.completionToken) {
@@ -215,10 +229,11 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     pairing -> PairPage(app, t, rows)
-                    tab == "timer" -> TimerPage(app, t, rows, premium, wide, snap, shown) { gate = true }
-                    tab == "projects" -> ProjectsPage(app, t, rows, premium, wide, projectId, { projectId = it }) { gate = true }
-                    tab == "stats" -> StatsPage(app, t, rows, premium, wide, snap) { gate = true }
-                    else -> SettingsPage(app, t, rows, premium, wide, { pairing = true }) { gate = true }
+                    tab == "timer" -> TimerPage(app, t, rows, premium, wide, snap, shown) { }
+                    tab == "projects" -> ProjectsPage(app, t, rows, premium, wide, projectId, { projectId = it }) { }
+                    tab == "todos" -> TodosPage(app, t, rows, wide)
+                    tab == "stats" -> StatsPage(app, t, rows, premium, wide, snap) { }
+                    else -> SettingsPage(app, t, rows, premium, wide, { pairing = true }) { }
                 }
             }
         }
@@ -235,6 +250,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
                 NavigationBar {
                     NavigationBarItem(selected = tab == "timer", onClick = { tab = "timer"; pairing = false }, icon = { Icon(Icons.Filled.Timer, t.timer) }, label = { Text(t.timer) })
                     NavigationBarItem(selected = tab == "projects", onClick = { tab = "projects"; pairing = false }, icon = { Icon(Icons.Filled.Folder, t.projects) }, label = { Text(t.projects) })
+                    NavigationBarItem(selected = tab == "todos", onClick = { tab = "todos"; pairing = false }, icon = { Icon(Icons.Filled.Check, t.todos) }, label = { Text(t.todos) })
                     NavigationBarItem(selected = tab == "stats", onClick = { tab = "stats"; pairing = false }, icon = { Icon(Icons.Filled.BarChart, t.stats) }, label = { Text(t.stats) })
                     NavigationBarItem(selected = tab == "settings", onClick = { tab = "settings"; pairing = false }, icon = { Icon(Icons.Filled.Settings, t.settings) }, label = { Text(t.settings) })
                 }
@@ -243,17 +259,6 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
             page(Modifier.padding(padding).fillMaxSize())
         }
     }
-    if (gate) {
-        AlertDialog(
-            onDismissRequest = { gate = false },
-            title = { Text(t.locked) },
-            text = { Text(t.premiumIntro) },
-            confirmButton = {
-                TextButton(onClick = { gate = false; tab = "settings"; pairing = false }) { Text(t.openSwitch) }
-            },
-            dismissButton = { TextButton(onClick = { gate = false }) { Text(t.cancel) } },
-        )
-    }
 }
 
 @Composable
@@ -261,6 +266,7 @@ private fun Rail(t: T, tab: String, onTab: (String) -> Unit) {
     NavigationRail {
         NavigationRailItem(selected = tab == "timer", onClick = { onTab("timer") }, icon = { Icon(Icons.Filled.Timer, t.timer) }, label = { Text(t.timer) })
         NavigationRailItem(selected = tab == "projects", onClick = { onTab("projects") }, icon = { Icon(Icons.Filled.Folder, t.projects) }, label = { Text(t.projects) })
+        NavigationRailItem(selected = tab == "todos", onClick = { onTab("todos") }, icon = { Icon(Icons.Filled.Check, t.todos) }, label = { Text(t.todos) })
         NavigationRailItem(selected = tab == "stats", onClick = { onTab("stats") }, icon = { Icon(Icons.Filled.BarChart, t.stats) }, label = { Text(t.stats) })
         NavigationRailItem(selected = tab == "settings", onClick = { onTab("settings") }, icon = { Icon(Icons.Filled.Settings, t.settings) }, label = { Text(t.settings) })
     }
@@ -386,8 +392,9 @@ private fun TimerPage(
     val ring = @Composable {
         Box(Modifier.size(280.dp), contentAlignment = Alignment.Center) {
             val color = MaterialTheme.colorScheme.primary
+            val track = MaterialTheme.colorScheme.outline
             Canvas(Modifier.fillMaxSize().padding(12.dp)) {
-                drawArc(color.copy(alpha = 0.18f), 0f, 360f, false, style = Stroke(22f, cap = StrokeCap.Round))
+                drawArc(track, 0f, 360f, false, style = Stroke(22f, cap = StrokeCap.Round))
                 drawArc(color, -90f, 360f * progress, false, style = Stroke(22f, cap = StrokeCap.Round))
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -868,6 +875,8 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), t.share))
     }
     val charts: @Composable () -> Unit = {
+        val bar = MaterialTheme.colorScheme.primary
+        val hot = MaterialTheme.colorScheme.tertiary
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(if (pickedBar in bars.indices) weekDays[pickedBar].toString() + " · " + clockWords(bars[pickedBar]) else t.week, style = MaterialTheme.typography.titleMedium)
             Canvas(
@@ -897,7 +906,7 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                 bars.forEachIndexed { index, value ->
                     val h = (value.toFloat() / max.toFloat()) * size.height
                     drawRoundRect(
-                        color = if (index == pickedBar) Color(0xFFC56A3A) else Color(0xFF1F6F54),
+                        color = if (index == pickedBar) hot else bar,
                         topLeft = Offset(index * (w + gap), size.height - h),
                         size = Size(w, h),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f),
@@ -912,6 +921,10 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         }
     }
     val pie: @Composable () -> Unit = {
+        val darkChart = MaterialTheme.colorScheme.background.isDark()
+        val sliceColors = slices.map { slice ->
+            chartColor(rows.alive(KIND_PROJECT).find { it.id == slice.id }?.f("color") ?: "C8922A", darkChart)
+        }
         val center = if (pickedSlice in slices.indices) {
             slices[pickedSlice].name.ifBlank { t.unlabeled } + "\n" + clockWords(slices[pickedSlice].millis) + " · " + percents.getOrElse(pickedSlice) { 0 } + "%"
         } else if (slices.isEmpty()) {
@@ -951,7 +964,7 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                     var start = -90f
                     slices.forEachIndexed { index, slice ->
                         val sweep = slice.millis.toFloat() / total * 360f
-                        drawArc(colorOf(rows.alive(KIND_PROJECT).find { it.id == slice.id }?.f("color") ?: "C8922A"), start, sweep, true)
+                        drawArc(sliceColors[index], start, sweep, true)
                         start += sweep
                     }
                 }
@@ -1133,6 +1146,117 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
 }
 
 @Composable
+private fun TodosPage(app: PresenceApp, t: T, rows: List<Rec>, wide: Boolean) {
+    val context = LocalContext.current
+    var draft by remember { mutableStateOf("") }
+    val items = rows.filter { it.kind == KIND_LOCAL && it.id.startsWith("todo:") && !it.deleted }
+        .sortedBy { it.f("sort").toLongOrNull() ?: it.updatedAt }
+    val editor: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(t.todos, style = MaterialTheme.typography.headlineMedium)
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(t.todoHint) },
+                singleLine = true,
+            )
+            Button(
+                onClick = {
+                    app.repo.addTodo(draft)
+                    draft = ""
+                    HomeWidgets.update(context)
+                },
+                enabled = draft.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) { Text(t.addItem) }
+        }
+    }
+    val list: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (items.isEmpty()) {
+                Text(t.emptyTodos, color = MaterialTheme.colorScheme.onSurface)
+            }
+            items.forEach { item ->
+                val id = item.id.removePrefix("todo:")
+                val done = item.f("done") == "1"
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Checkbox(checked = done, onCheckedChange = {
+                        app.repo.setTodoDone(id, it)
+                        HomeWidgets.update(context)
+                    })
+                    Text(
+                        item.f("title"),
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    TextButton(onClick = {
+                        app.repo.deleteTodo(id)
+                        HomeWidgets.update(context)
+                    }) {
+                        Icon(Icons.Filled.Delete, t.delete)
+                    }
+                }
+            }
+        }
+    }
+    if (wide) {
+        Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Column(Modifier.weight(1f)) { editor() }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { list() }
+        }
+    } else {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            editor()
+            list()
+        }
+    }
+}
+
+@Composable
+private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val ink = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    Surface(
+        color = background,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    ) {
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = selected, onClick = onClick)
+            Text(label, color = ink, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+private fun ReminderRow(
+    label: String,
+    on: Boolean,
+    hour: Int,
+    minute: Int,
+    onToggle: (Boolean) -> Unit,
+    onTime: (Int, Int) -> Unit,
+) {
+    val context = LocalContext.current
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+                Switch(checked = on, onCheckedChange = onToggle)
+            }
+            TextButton(
+                onClick = { TimePickerDialog(context, { _, h, m -> onTime(h, m) }, hour, minute, true).show() },
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(String.format(Locale.ROOT, "%02d:%02d", hour, minute), style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }
+}
+
+@Composable
 private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, onPair: () -> Unit, onGate: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1173,19 +1297,17 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             app.repo.setPref("alarm", "custom")
         }
     }
+    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val askNotify: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val scroll = rememberScrollState()
     val body: @Composable () -> Unit = {
         Column(Modifier.verticalScroll(scroll).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Surface(shape = MaterialTheme.shapes.large, tonalElevation = 2.dp) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(t.testerTitle, style = MaterialTheme.typography.titleLarge)
-                    Text(t.testerBody)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (premium) t.premiumOn else t.premiumOff, modifier = Modifier.weight(1f))
-                        Switch(checked = premium, onCheckedChange = { app.repo.setPremium(it) })
-                    }
-                }
-            }
             Text(t.timerSettings, style = MaterialTheme.typography.titleLarge)
             Stepper(t.focusLen, globals.focus, 1, 180) { app.repo.setPref("focus_min", it.toString()); app.center.refreshSettings() }
             Stepper(t.shortLen, globals.short, 1, 60) { app.repo.setPref("short_min", it.toString()); app.center.refreshSettings() }
@@ -1200,12 +1322,29 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
                 Switch(checked = globals.auto, onCheckedChange = { app.repo.setPref("auto_start", if (it) "1" else "0"); app.center.refreshSettings() })
             }
             Stepper(t.dayStarts, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
-            Text(t.appearance, style = MaterialTheme.typography.titleLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("system" to t.system, "light" to t.light, "dark" to t.dark).forEach { (id, label) ->
-                    FilterChip(selected = (flags["theme"] ?: "system") == id, onClick = { app.repo.updateFlags { it["theme"] = id } }, label = { Text(label) })
-                }
+            Text(t.reminders, style = MaterialTheme.typography.titleLarge)
+            ReminderRow(t.dailyReminder, globals.dailyOn, globals.dailyHour, globals.dailyMinute, { on ->
+                if (on) askNotify()
+                app.repo.setPref("daily_on", if (on) "1" else "0")
+                Reminders.reschedule(context)
+            }) { hour, minute ->
+                app.repo.setPref("daily_hour", hour.toString())
+                app.repo.setPref("daily_minute", minute.toString())
+                Reminders.reschedule(context)
             }
+            ReminderRow(t.streakReminder, globals.streakOn, globals.streakHour, globals.streakMinute, { on ->
+                if (on) askNotify()
+                app.repo.setPref("streak_on", if (on) "1" else "0")
+                Reminders.reschedule(context)
+            }) { hour, minute ->
+                app.repo.setPref("streak_hour", hour.toString())
+                app.repo.setPref("streak_minute", minute.toString())
+                Reminders.reschedule(context)
+            }
+            Text(t.appearance, style = MaterialTheme.typography.titleLarge)
+            ChoiceRow(t.followSystem, (flags["theme"] ?: "system") == "system") { app.repo.updateFlags { it["theme"] = "system" } }
+            ChoiceRow(t.light, flags["theme"] == "light") { app.repo.updateFlags { it["theme"] = "light" } }
+            ChoiceRow(t.dark, flags["theme"] == "dark") { app.repo.updateFlags { it["theme"] = "dark" } }
             Text(t.textSize)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("compact" to t.compact, "standard" to t.standard, "large" to t.large).forEach { (id, label) ->
@@ -1222,23 +1361,22 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("chime" to t.chime, "bell" to t.bell, "pulse" to t.pulse, "custom" to t.custom).forEach { (id, label) ->
                     FilterChip(selected = globals.alarm == id, onClick = {
-                        val paid = id != "chime"
-                        if (paid && !premium) onGate() else if (id == "custom") sound.launch(arrayOf("audio/*")) else app.repo.setPref("alarm", id)
+                        if (id == "custom") sound.launch(arrayOf("audio/*")) else app.repo.setPref("alarm", id)
                     }, label = { Text(label) })
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("off" to t.off, "rain" to t.rain, "brook" to t.brook, "hearth" to t.hearth).forEach { (id, label) ->
                     FilterChip(selected = globals.background == id, onClick = {
-                        if (id != "off" && !premium) onGate() else app.repo.setPref("background", id)
+                        app.repo.setPref("background", id)
                     }, label = { Text(label) })
                 }
             }
             Stepper(t.volume, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()) }
             Text(t.data, style = MaterialTheme.typography.titleLarge)
-            Button(onClick = { if (premium) exportJson.launch("presence-backup.json") else onGate() }, modifier = Modifier.fillMaxWidth()) { Text(t.exportJson) }
-            Button(onClick = { if (premium) exportCsv.launch("presence-sessions.csv") else onGate() }, modifier = Modifier.fillMaxWidth()) { Text(t.exportCsv) }
-            Button(onClick = { if (premium) importJson.launch(arrayOf("application/json", "text/*", "*/*")) else onGate() }, modifier = Modifier.fillMaxWidth()) { Text(t.importJson) }
+            Button(onClick = { exportJson.launch("presence-backup.json") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportJson) }
+            Button(onClick = { exportCsv.launch("presence-sessions.csv") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportCsv) }
+            Button(onClick = { importJson.launch(arrayOf("application/json", "text/*", "*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(t.importJson) }
             if (note.isNotEmpty()) Text(note)
             Text(t.devices, style = MaterialTheme.typography.titleLarge)
             Button(onClick = onPair, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pair) }

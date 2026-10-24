@@ -6,7 +6,9 @@ import app.presence.data.Repo
 import app.presence.sound.Player
 import app.presence.sync.Lan
 import app.presence.timer.Notifier
+import app.presence.timer.Reminders
 import app.presence.timer.TimerCenter
+import app.presence.widget.HomeWidgets
 import app.presence.timer.reactTo
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +47,8 @@ class PresenceApp : Application() {
             link.start()
             ready.complete(Unit)
             center.catchUp()
+            Reminders.reschedule(this@PresenceApp)
+            HomeWidgets.update(this@PresenceApp)
         }
     }
 }

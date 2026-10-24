@@ -165,6 +165,23 @@ class T(lang: String) {
     val sounds = s("Sounds", "Sesler", "Sonidos", "Sons", "Sons", "音", "소리")
     val timerSettings = s("Timer", "Zamanlayıcı", "Temporizador", "Temporizador", "Minuteur", "タイマー", "타이머")
     val message = s("Note", "Not", "Nota", "Nota", "Note", "メモ", "메모")
+    val todos = s("Todos", "Yapılacaklar", "Pendientes", "Afazeres", "À faire", "やること", "할 일")
+    val addItem = s("Add", "Ekle", "Añadir", "Adicionar", "Ajouter", "追加", "추가")
+    val emptyTodos = s("Nothing on the list.", "Listede bir şey yok.", "No hay nada en la lista.", "Nada na lista.", "Rien sur la liste.", "リストは空です。", "목록이 비어 있습니다.")
+    val todoHint = s("Add a todo", "Yapılacak ekle", "Añadir un pendiente", "Adicionar um afazer", "Ajouter une tâche", "やることを追加", "할 일 추가")
+    val reminders = s("Reminders", "Anımsatmalar", "Recordatorios", "Lembretes", "Rappels", "リマインダー", "알림")
+    val dailyReminder = s("Daily reminder", "Günlük anımsatma", "Recordatorio diario", "Lembrete diário", "Rappel du jour", "毎日のリマインダー", "매일 알림")
+    val streakReminder = s("Streak reminder", "Seri anımsatması", "Recordatorio de racha", "Lembrete de sequência", "Rappel de série", "連続のリマインダー", "연속 알림")
+    val timeToFocus = s("Time to focus.", "Odaklanma zamanı.", "Hora de enfocarte.", "Hora de focar.", "C’est l’heure de se concentrer.", "集中の時間です。", "집중할 시간입니다.")
+    val followSystem = s("Follow system", "Sistemi izle", "Seguir el sistema", "Seguir o sistema", "Suivre le système", "システムに合わせる", "시스템 따르기")
+    val start = s("Start", "Başlat", "Empezar", "Começar", "Commencer", "開始", "시작")
+    val streak = s("Streak", "Seri", "Racha", "Sequência", "Série", "連続", "연속")
+
+    fun streakLine(count: Int, logged: Boolean): String = when {
+        count <= 0 -> s("No streak yet", "Henüz seri yok", "Aún no hay racha", "Ainda não há sequência", "Pas encore de série", "まだ連続はありません", "아직 연속이 없습니다")
+        logged -> s("$count days, with today", "$count gün, bugün dahil", "$count días, con hoy", "$count dias, com hoje", "$count jours, avec aujourd’hui", "$count 日、今日を含む", "${count}일, 오늘 포함")
+        else -> s("$count days. Today is still open.", "$count gün. Bugün henüz açık.", "$count días. Hoy sigue abierto.", "$count dias. Hoje ainda está aberto.", "$count jours. Aujourd’hui est encore ouvert.", "$count 日。今日はまだこれから。", "${count}일. 오늘은 아직 열려 있습니다.")
+    }
 
     fun cycleLine(done: Int, total: Int): String = s(
         "Focus $done of $total",

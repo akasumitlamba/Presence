@@ -560,6 +560,37 @@ fun dayTotals(records: List<Rec>, days: List<LocalDate>, zone: ZoneId, dayStartH
     return days.map { map.getValue(it) }
 }
 
+fun streakDays(records: List<Rec>, nowEpoch: Long, zone: ZoneId, dayStartHour: Int): Int {
+    val today = dayKey(nowEpoch, zone, dayStartHour)
+    val days = records.mapNotNull { rec ->
+        if (sessionCountedMillis(rec) <= 0L) return@mapNotNull null
+        val start = rec.f("startedAt").toLongOrNull() ?: return@mapNotNull null
+        dayKey(start, zone, dayStartHour)
+    }.toSet()
+    var cursor = if (today in days) today else today.minusDays(1)
+    var count = 0
+    while (cursor in days) {
+        count++
+        cursor = cursor.minusDays(1)
+    }
+    return count
+}
+
+fun loggedToday(records: List<Rec>, nowEpoch: Long, zone: ZoneId, dayStartHour: Int): Boolean {
+    val today = dayKey(nowEpoch, zone, dayStartHour)
+    return records.any { rec ->
+        sessionCountedMillis(rec) > 0L &&
+            rec.f("startedAt").toLongOrNull()?.let { dayKey(it, zone, dayStartHour) == today } == true
+    }
+}
+
+fun nextClockMillis(hour: Int, minute: Int, nowEpoch: Long, zone: ZoneId): Long {
+    val now = Instant.ofEpochMilli(nowEpoch).atZone(zone)
+    var next = now.withHour(hour.coerceIn(0, 23)).withMinute(minute.coerceIn(0, 59)).withSecond(0).withNano(0)
+    if (!next.isAfter(now)) next = next.plusDays(1)
+    return next.toInstant().toEpochMilli()
+}
+
 fun freeProjectIds(projects: List<Rec>): Set<String> =
     projects.filter { !it.deleted }
         .sortedWith(compareBy({ it.f("createdAt").toLongOrNull() ?: it.updatedAt }, { it.id }))

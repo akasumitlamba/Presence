@@ -11,7 +11,7 @@ import androidx.core.content.ContextCompat
 import app.presence.PresenceApp
 import app.presence.core.Snap
 import app.presence.core.Step
-import app.presence.widget.PresenceWidget
+import app.presence.widget.HomeWidgets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,6 +45,15 @@ class TimerService : Service() {
                     val snap = app.center.snap()
                     if (snap.status == "awaiting") app.center.start(snap.awaitingKind.ifEmpty { "focus" }, null, null)
                 }
+                START -> {
+                    val snap = app.center.snap()
+                    when (snap.status) {
+                        "paused" -> app.center.resume()
+                        "running" -> Unit
+                        "awaiting" -> app.center.start(snap.awaitingKind.ifEmpty { "focus" }, null, null)
+                        else -> app.center.start("focus", null, null)
+                    }
+                }
                 DISMISS -> app.notifier.cancelDone()
                 DUE -> app.center.due(intent.getStringExtra(EXTRA_TOKEN))
                 CATCHUP -> app.center.catchUp()
@@ -77,7 +86,7 @@ class TimerService : Service() {
                     break
                 }
                 app.center.due(null)
-                PresenceWidget.update(this@TimerService)
+                HomeWidgets.update(this@TimerService)
             }
         }
     }
@@ -104,6 +113,7 @@ class TimerService : Service() {
         const val DUE = "app.presence.DUE"
         const val ENSURE = "app.presence.ENSURE"
         const val CATCHUP = "app.presence.CATCHUP"
+        const val START = "app.presence.START"
         const val EXTRA_TOKEN = "token"
 
         fun ensure(context: Context) {
@@ -121,14 +131,12 @@ class TimerService : Service() {
 fun PresenceApp.reactTo(step: Step) {
     notifier.schedule(step.snap)
     val globals = repo.globals()
-    val premium = repo.premium()
     val alarmKind = when {
-        !premium && globals.alarm != "chime" -> "chime"
         globals.alarm == "custom" && !java.io.File(filesDir, "alarm-custom").exists() -> "chime"
         else -> globals.alarm
     }
     if (step.chime) player.alarm(alarmKind)
-    val sound = if (premium) globals.background else "off"
+    val sound = globals.background
     val running = step.snap.status == "running" && (step.snap.kind == "focus" || step.snap.kind == "track")
     if (running && sound != "off") player.loop(sound, globals.volume / 100f) else player.stopLoop()
     if (step.snap.status == "running" || step.snap.status == "paused") {
@@ -140,5 +148,5 @@ fun PresenceApp.reactTo(step: Step) {
     } else if (step.chime && step.snap.status == "awaiting") {
         notifier.finished(step.snap)
     }
-    PresenceWidget.update(this)
+    HomeWidgets.update(this)
 }

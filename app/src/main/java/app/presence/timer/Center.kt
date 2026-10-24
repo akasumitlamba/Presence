@@ -125,7 +125,7 @@ class TimerCenter(
         var long = globals.long
         var cycles = globals.cycles
         var countUp = globals.countUp
-        if (repo.premium() && project != null) {
+        if (project != null) {
             project.f("focus").toIntOrNull()?.let { focus = it.coerceIn(1, 180) }
             project.f("short").toIntOrNull()?.let { short = it.coerceIn(1, 60) }
             project.f("long").toIntOrNull()?.let { long = it.coerceIn(1, 120) }

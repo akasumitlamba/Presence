@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Presence</string>
-    <string name="widget_desc">Today and the focus timer</string>
+    <string name="widget_desc">Start or pause a focus session</string>
+    <string name="widget_session">Session</string>
+    <string name="widget_session_desc">Start or pause a focus session</string>
+    <string name="widget_stats">Stats</string>
+    <string name="widget_stats_desc">Today and this week</string>
+    <string name="widget_streak">Streak</string>
+    <string name="widget_streak_desc">Days kept in a row</string>
+    <string name="widget_todos">Todos</string>
+    <string name="widget_todos_desc">What is still open</string>
 </resources>
