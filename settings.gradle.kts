@@ -14,6 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "canto"
+rootProject.name = "presence"
 include(":core")
 include(":app")

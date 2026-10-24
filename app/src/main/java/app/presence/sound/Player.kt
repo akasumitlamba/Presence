@@ -1,11 +1,11 @@
-package app.canto.sound
+package app.presence.sound
 
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.MediaPlayer
-import app.canto.core.Tones
+import app.presence.core.Tones
 import java.io.File
 
 class Player(private val context: Context) {

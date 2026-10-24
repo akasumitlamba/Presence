@@ -1,11 +1,11 @@
-package app.canto.timer
+package app.presence.timer
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.PowerManager
 import androidx.core.content.ContextCompat
-import app.canto.CantoApp
+import app.presence.PresenceApp
 import kotlinx.coroutines.runBlocking
 
 class AlarmReceiver : BroadcastReceiver() {
@@ -13,11 +13,11 @@ class AlarmReceiver : BroadcastReceiver() {
         val pending = goAsync()
         val token = intent.getStringExtra(TimerService.EXTRA_TOKEN)
         val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val wake = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "canto:due")
+        val wake = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "presence:due")
         wake.acquire(12_000L)
         Thread {
             try {
-                val app = context.applicationContext as CantoApp
+                val app = context.applicationContext as PresenceApp
                 runBlocking { app.ready.await() }
                 app.center.due(token)
                 try {
@@ -41,7 +41,7 @@ class BootReceiver : BroadcastReceiver() {
         val pending = goAsync()
         Thread {
             try {
-                val app = context.applicationContext as CantoApp
+                val app = context.applicationContext as PresenceApp
                 runBlocking { app.ready.await() }
                 app.center.catchUp()
                 ContextCompat.startForegroundService(

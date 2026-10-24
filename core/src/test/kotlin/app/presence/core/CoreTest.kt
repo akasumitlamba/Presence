@@ -1,4 +1,4 @@
-package app.canto.core
+package app.presence.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

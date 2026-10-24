@@ -1,4 +1,4 @@
-package app.canto.data
+package app.presence.data
 
 import android.content.Context
 import androidx.room.Dao
@@ -9,20 +9,20 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import app.canto.core.Catalog
-import app.canto.core.GROUP_PERSONAL
-import app.canto.core.GROUP_STUDY
-import app.canto.core.GROUP_WORK
-import app.canto.core.KIND_GROUP
-import app.canto.core.KIND_LOCAL
-import app.canto.core.KIND_PREF
-import app.canto.core.Rec
-import app.canto.core.Snap
-import app.canto.core.TIMER_PREF_IDS
-import app.canto.core.f
-import app.canto.core.mergeRecords
-import app.canto.core.snapFrom
-import app.canto.core.toFields
+import app.presence.core.Catalog
+import app.presence.core.GROUP_PERSONAL
+import app.presence.core.GROUP_STUDY
+import app.presence.core.GROUP_WORK
+import app.presence.core.KIND_GROUP
+import app.presence.core.KIND_LOCAL
+import app.presence.core.KIND_PREF
+import app.presence.core.Rec
+import app.presence.core.Snap
+import app.presence.core.TIMER_PREF_IDS
+import app.presence.core.f
+import app.presence.core.mergeRecords
+import app.presence.core.snapFrom
+import app.presence.core.toFields
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -52,7 +52,7 @@ interface RecDao {
 }
 
 @Database(entities = [RecEntity::class], version = 1, exportSchema = false)
-abstract class CantoDb : RoomDatabase() {
+abstract class PresenceDb : RoomDatabase() {
     abstract fun recs(): RecDao
 }
 
@@ -89,7 +89,7 @@ data class Globals(
 )
 
 class Repo(private val context: Context) : Catalog {
-    private val db = Room.databaseBuilder(context.applicationContext, CantoDb::class.java, "canto.db")
+    private val db = Room.databaseBuilder(context.applicationContext, PresenceDb::class.java, "presence.db")
         .allowMainThreadQueries()
         .build()
     private val dao = db.recs()
@@ -105,7 +105,7 @@ class Repo(private val context: Context) : Catalog {
                 val id = UUID.randomUUID().toString()
                 dao.upsert(
                     listOf(
-                        Rec(KIND_LOCAL, "device", now, id, false, mapOf("id" to id, "name" to "Canto")).toEntity(),
+                        Rec(KIND_LOCAL, "device", now, id, false, mapOf("id" to id, "name" to "Presence")).toEntity(),
                     ),
                 )
             }
@@ -156,7 +156,7 @@ class Repo(private val context: Context) : Catalog {
     override fun deviceId(): String = synchronized(lock) { deviceIdLocked() }
 
     override fun deviceName(): String = synchronized(lock) {
-        dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "device" }?.toRec()?.f("name")?.ifEmpty { "Canto" } ?: "Canto"
+        dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "device" }?.toRec()?.f("name")?.ifEmpty { "Presence" } ?: "Presence"
     }
 
     fun setDeviceName(name: String) {
@@ -184,7 +184,7 @@ class Repo(private val context: Context) : Catalog {
                         now,
                         deviceIdLocked(),
                         false,
-                        mapOf("name" to name.ifEmpty { "Canto" }, "token" to token, "lastSync" to now.toString()),
+                        mapOf("name" to name.ifEmpty { "Presence" }, "token" to token, "lastSync" to now.toString()),
                     ).toEntity(),
                 ),
             )
@@ -214,7 +214,7 @@ class Repo(private val context: Context) : Catalog {
     fun peers(): List<Peer> = synchronized(lock) {
         dao.all().map { it.toRec() }
             .filter { it.kind == KIND_LOCAL && it.id.startsWith("peer:") && !it.deleted && it.f("token").isNotEmpty() }
-            .map { Peer(it.id.removePrefix("peer:"), it.f("name").ifEmpty { "Canto" }, it.f("token"), it.f("lastSync").toLongOrNull() ?: 0L) }
+            .map { Peer(it.id.removePrefix("peer:"), it.f("name").ifEmpty { "Presence" }, it.f("token"), it.f("lastSync").toLongOrNull() ?: 0L) }
     }
 
     override fun mergeFrom(incoming: List<Rec>) {

@@ -1,4 +1,4 @@
-package app.canto.core
+package app.presence.core
 
 import kotlin.math.PI
 import kotlin.math.exp

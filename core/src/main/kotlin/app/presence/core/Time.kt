@@ -1,4 +1,4 @@
-package app.canto.core
+package app.presence.core
 
 import java.time.Instant
 import java.time.LocalDate
@@ -104,7 +104,7 @@ fun shareSummary(
     groupOf: (String) -> String,
 ): String {
     val total = rows.sumOf { it.second }
-    val lines = mutableListOf("Canto · $title", rangeLabel, clockWords(total), "")
+    val lines = mutableListOf("Presence · $title", rangeLabel, clockWords(total), "")
     val grouped = rows.groupBy { groupOf(it.first) }
     for ((group, items) in grouped) {
         if (group.isNotEmpty()) lines += group

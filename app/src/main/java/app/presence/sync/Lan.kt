@@ -1,4 +1,4 @@
-package app.canto.sync
+package app.presence.sync
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -8,8 +8,8 @@ import android.net.NetworkRequest
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
-import app.canto.core.Node
-import app.canto.data.Repo
+import app.presence.core.Node
+import app.presence.data.Repo
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -39,7 +39,7 @@ class Lan(
     private val main = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val nsd = context.getSystemService(NsdManager::class.java)
     private val wifi = context.getSystemService(WifiManager::class.java)
-    private val multicast = wifi.createMulticastLock("canto").apply { setReferenceCounted(false) }
+    private val multicast = wifi.createMulticastLock("presence").apply { setReferenceCounted(false) }
     private val seen = ConcurrentHashMap<String, Seen>()
     private val names = ConcurrentHashMap<String, String>()
     private val queue = ArrayDeque<NsdServiceInfo>()
@@ -211,7 +211,7 @@ class Lan(
         if (browsing) return
         browsing = true
         nsd.discoverServices(
-            "_canto._tcp.",
+            "_presence._tcp.",
             NsdManager.PROTOCOL_DNS_SD,
             object : NsdManager.DiscoveryListener {
                 override fun onStartDiscoveryFailed(type: String, error: Int) { browsing = false }
@@ -252,7 +252,7 @@ class Lan(
                     val host = serviceInfo.host?.hostAddress
                     if (id != null && host != null && id != repo.deviceId()) {
                         val code = serviceInfo.attributes?.get("code")?.toString(Charsets.UTF_8)
-                        val name = serviceInfo.attributes?.get("nm")?.toString(Charsets.UTF_8) ?: "Canto"
+                        val name = serviceInfo.attributes?.get("nm")?.toString(Charsets.UTF_8) ?: "Presence"
                         seen[id] = Seen(id, name, host, serviceInfo.port, code)
                         names[serviceInfo.serviceName] = id
                     }
@@ -306,8 +306,8 @@ class Lan(
             }
         }
         val info = NsdServiceInfo().apply {
-            serviceName = "Canto" + repo.deviceId().take(8)
-            serviceType = "_canto._tcp."
+            serviceName = "Presence" + repo.deviceId().take(8)
+            serviceType = "_presence._tcp."
             port = node.port
             setAttribute("id", repo.deviceId())
             setAttribute("nm", repo.deviceName().take(32))

@@ -18,7 +18,7 @@
             android:id="@+id/widget_kicker"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Canto"
+            android:text="Presence"
             android:textColor="#1F6F54"
             android:textSize="12sp" />
 

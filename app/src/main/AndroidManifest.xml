@@ -16,13 +16,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="32" />
 
     <application
-        android:name=".CantoApp"
+        android:name=".PresenceApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Canto">
+        android:theme="@style/Theme.Presence">
 
         <activity
             android:name=".MainActivity"
@@ -39,7 +39,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Focus timer that keeps the remaining time visible while Canto is in the background." />
+                android:value="Focus timer that keeps the remaining time visible while Presence is in the background." />
         </service>
 
         <receiver
@@ -55,14 +55,14 @@
         </receiver>
 
         <receiver
-            android:name=".widget.CantoWidget"
+            android:name=".widget.PresenceWidget"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/canto_widget_info" />
+                android:resource="@xml/presence_widget_info" />
         </receiver>
     </application>
 </manifest>

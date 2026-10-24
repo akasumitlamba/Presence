@@ -1,12 +1,12 @@
-# Canto
+# Presence
 
-Canto is a focus-cycle timer and time tracker for Android. A canto is one section of a long work. Projects, tasks, and sessions stay on the phone. There is no account.
+Presence is a focus-cycle timer and time tracker for Android. It is the time you give to one piece of work. Projects, tasks, and sessions stay on the phone. There is no account.
 
-Package: `app.canto`. Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+Package: `app.presence`. Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
 ## Install
 
-1. Download `canto.apk` from the GitHub Release.
+1. Download `presence.apk` from the GitHub Release.
 2. On the phone, allow install from your browser or file app.
 3. Open the APK and install it.
 4. The debug signature is the one this build uses, so a later install must be the same signature or the previous copy has to be removed first.
@@ -34,7 +34,7 @@ Settings opens with **Tester switch**. It turns premium on or off so both modes 
 - English, Turkish, Spanish, Portuguese, French, Japanese, and Korean
 - Wi-Fi pairing and sync
 - Phone layout and the wider layout
-- A home-screen widget that shows today’s minutes and opens Canto
+- A home-screen widget that shows today’s minutes and opens Presence
 
 ### Premium, with the tester switch
 
@@ -56,7 +56,7 @@ Turning the switch off keeps the data and locks the extra tools. The core timer 
 
 ## Pair two phones
 
-Both phones need Canto and the same Wi-Fi. Mobile data is not used. The first time you show or enter a code, Android asks for nearby-Wi-Fi access so the phones can find each other. That prompt does not turn on location.
+Both phones need Presence and the same Wi-Fi. Mobile data is not used. The first time you show or enter a code, Android asks for nearby-Wi-Fi access so the phones can find each other. That prompt does not turn on location.
 
 1. On one phone, open Settings → Pair on Wi-Fi → **Show code**.
 2. On the other, choose **Enter code** and type the four digits.
@@ -69,7 +69,7 @@ If the same record changes on both phones, the later edit wins. If a timer is ru
 
 ## Background
 
-The phase keeps going when you leave Canto, lock the screen, or the process is killed. The notification shows the time left. When the length is reached, the alarm plays and a notification appears even if Canto is not in front. A paused phase stays paused with the same time left.
+The phase keeps going when you leave Presence, lock the screen, or the process is killed. The notification shows the time left. When the length is reached, the alarm plays and a notification appears even if Presence is not in front. A paused phase stays paused with the same time left.
 
 ## Build
 

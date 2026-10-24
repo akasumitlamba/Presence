@@ -1,6 +1,6 @@
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
-package app.canto.ui
+package app.presence.ui
 
 import android.Manifest
 import android.app.DatePickerDialog
@@ -90,41 +90,41 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import app.canto.CantoApp
-import app.canto.core.FREE_PROJECTS
-import app.canto.core.FREE_TASKS
-import app.canto.core.GROUP_PERSONAL
-import app.canto.core.GROUP_STUDY
-import app.canto.core.GROUP_WORK
-import app.canto.core.KIND_GROUP
-import app.canto.core.KIND_LOCAL
-import app.canto.core.KIND_PROJECT
-import app.canto.core.KIND_SESSION
-import app.canto.core.KIND_TAG
-import app.canto.core.KIND_TASK
-import app.canto.core.Rec
-import app.canto.core.Snap
-import app.canto.core.alive
-import app.canto.core.clockDigits
-import app.canto.core.clockWords
-import app.canto.core.dailyTargetMinutes
-import app.canto.core.dayKey
-import app.canto.core.dayTotals
-import app.canto.core.decodeBackup
-import app.canto.core.displayMillis
-import app.canto.core.encodeBackup
-import app.canto.core.f
-import app.canto.core.freeProjectIds
-import app.canto.core.manualSession
-import app.canto.core.overlapsOpen
-import app.canto.core.sessionsCsv
-import app.canto.core.SYNC_KINDS
-import app.canto.core.sessionCountedMillis
-import app.canto.core.shareSummary
-import app.canto.core.slicesFor
-import app.canto.core.snapFrom
-import app.canto.core.wholePercents
-import app.canto.core.workedMillisFor
+import app.presence.PresenceApp
+import app.presence.core.FREE_PROJECTS
+import app.presence.core.FREE_TASKS
+import app.presence.core.GROUP_PERSONAL
+import app.presence.core.GROUP_STUDY
+import app.presence.core.GROUP_WORK
+import app.presence.core.KIND_GROUP
+import app.presence.core.KIND_LOCAL
+import app.presence.core.KIND_PROJECT
+import app.presence.core.KIND_SESSION
+import app.presence.core.KIND_TAG
+import app.presence.core.KIND_TASK
+import app.presence.core.Rec
+import app.presence.core.Snap
+import app.presence.core.alive
+import app.presence.core.clockDigits
+import app.presence.core.clockWords
+import app.presence.core.dailyTargetMinutes
+import app.presence.core.dayKey
+import app.presence.core.dayTotals
+import app.presence.core.decodeBackup
+import app.presence.core.displayMillis
+import app.presence.core.encodeBackup
+import app.presence.core.f
+import app.presence.core.freeProjectIds
+import app.presence.core.manualSession
+import app.presence.core.overlapsOpen
+import app.presence.core.sessionsCsv
+import app.presence.core.SYNC_KINDS
+import app.presence.core.sessionCountedMillis
+import app.presence.core.shareSummary
+import app.presence.core.slicesFor
+import app.presence.core.snapFrom
+import app.presence.core.wholePercents
+import app.presence.core.workedMillisFor
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -138,9 +138,9 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
-fun CantoRoot() {
+fun PresenceRoot() {
     val context = LocalContext.current
-    val app = context.applicationContext as CantoApp
+    val app = context.applicationContext as PresenceApp
     var ready by remember { mutableStateOf(app.ready.isCompleted) }
     LaunchedEffect(Unit) {
         app.ready.await()
@@ -148,7 +148,7 @@ fun CantoRoot() {
     }
     if (!ready) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-            Text("Canto", style = MaterialTheme.typography.headlineMedium)
+            Text("Presence", style = MaterialTheme.typography.headlineMedium)
         }
         return
     }
@@ -171,14 +171,14 @@ fun CantoRoot() {
     androidx.compose.runtime.CompositionLocalProvider(
         LocalDensity provides Density(density.density * scale, density.fontScale * scale),
     ) {
-        CantoTheme(dark) {
+        PresenceTheme(dark) {
             Shell(app, rows, t, premium, wide)
         }
     }
 }
 
 @Composable
-private fun Shell(app: CantoApp, rows: List<Rec>, t: T, premium: Boolean, wide: Boolean) {
+private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wide: Boolean) {
     val context = LocalContext.current
     var tab by remember { mutableStateOf("timer") }
     var projectId by remember { mutableStateOf<String?>(null) }
@@ -268,7 +268,7 @@ private fun Rail(t: T, tab: String, onTab: (String) -> Unit) {
 
 @Composable
 private fun Mini(t: T, snap: Snap, shown: Long, onOpen: () -> Unit) {
-    val app = LocalContext.current.applicationContext as CantoApp
+    val app = LocalContext.current.applicationContext as PresenceApp
     Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -291,7 +291,7 @@ private fun phase(t: T, kind: String) = when (kind) {
 
 @Composable
 private fun TimerPage(
-    app: CantoApp,
+    app: PresenceApp,
     t: T,
     rows: List<Rec>,
     premium: Boolean,
@@ -421,7 +421,7 @@ private fun TimerPage(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProjectsPage(
-    app: CantoApp,
+    app: PresenceApp,
     t: T,
     rows: List<Rec>,
     premium: Boolean,
@@ -622,7 +622,7 @@ private fun ProjectsPage(
     }
 }
 
-private fun move(app: CantoApp, projects: List<Rec>, project: Rec, direction: Int) {
+private fun move(app: PresenceApp, projects: List<Rec>, project: Rec, direction: Int) {
     val index = projects.indexOfFirst { it.id == project.id }
     val other = projects.getOrNull(index + direction) ?: return
     val a = project.body.toMutableMap()
@@ -639,7 +639,7 @@ private fun move(app: CantoApp, projects: List<Rec>, project: Rec, direction: In
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProjectDetail(
-    app: CantoApp,
+    app: PresenceApp,
     t: T,
     rows: List<Rec>,
     project: Rec,
@@ -834,7 +834,7 @@ private fun NumberRow(label: String, value: String, onChange: (String) -> Unit) 
 }
 
 @Composable
-private fun StatsPage(app: CantoApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, snap: Snap, onGate: () -> Unit) {
+private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, snap: Snap, onGate: () -> Unit) {
     val context = LocalContext.current
     val zone = ZoneId.systemDefault()
     val dayStart = app.repo.globals().dayStart
@@ -1076,7 +1076,7 @@ private fun CalendarBlock(
 
 @Composable
 private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, snap: Snap, onClose: () -> Unit, onDone: (String) -> Unit) {
-    val app = LocalContext.current.applicationContext as CantoApp
+    val app = LocalContext.current.applicationContext as PresenceApp
     val projects = rows.alive(KIND_PROJECT)
     var project by remember { mutableStateOf(projects.firstOrNull()?.id.orEmpty()) }
     var hours by remember { mutableIntStateOf(0) }
@@ -1133,7 +1133,7 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
 }
 
 @Composable
-private fun SettingsPage(app: CantoApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, onPair: () -> Unit, onGate: () -> Unit) {
+private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, onPair: () -> Unit, onGate: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val globals = app.repo.globals()
@@ -1236,8 +1236,8 @@ private fun SettingsPage(app: CantoApp, t: T, rows: List<Rec>, premium: Boolean,
             }
             Stepper(t.volume, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()) }
             Text(t.data, style = MaterialTheme.typography.titleLarge)
-            Button(onClick = { if (premium) exportJson.launch("canto-backup.json") else onGate() }, modifier = Modifier.fillMaxWidth()) { Text(t.exportJson) }
-            Button(onClick = { if (premium) exportCsv.launch("canto-sessions.csv") else onGate() }, modifier = Modifier.fillMaxWidth()) { Text(t.exportCsv) }
+            Button(onClick = { if (premium) exportJson.launch("presence-backup.json") else onGate() }, modifier = Modifier.fillMaxWidth()) { Text(t.exportJson) }
+            Button(onClick = { if (premium) exportCsv.launch("presence-sessions.csv") else onGate() }, modifier = Modifier.fillMaxWidth()) { Text(t.exportCsv) }
             Button(onClick = { if (premium) importJson.launch(arrayOf("application/json", "text/*", "*/*")) else onGate() }, modifier = Modifier.fillMaxWidth()) { Text(t.importJson) }
             if (note.isNotEmpty()) Text(note)
             Text(t.devices, style = MaterialTheme.typography.titleLarge)
@@ -1260,7 +1260,7 @@ private fun SettingsPage(app: CantoApp, t: T, rows: List<Rec>, premium: Boolean,
 }
 
 @Composable
-private fun PairPage(app: CantoApp, t: T, rows: List<Rec>) {
+private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
     val context = LocalContext.current
     val offer by app.lan.offer.collectAsState()
     val until by app.lan.offerUntil.collectAsState()
@@ -1315,7 +1315,7 @@ private fun PairPage(app: CantoApp, t: T, rows: List<Rec>) {
             val id = peer.id.removePrefix("peer:")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(peer.f("name").ifBlank { "Canto" })
+                    Text(peer.f("name").ifBlank { "Presence" })
                     val last = peer.f("lastSync").toLongOrNull() ?: 0L
                     if (last > 0) Text(clockDigits(System.currentTimeMillis() - last))
                 }

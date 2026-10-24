@@ -1,19 +1,19 @@
-package app.canto.timer
+package app.presence.timer
 
-import app.canto.core.KIND_GROUP
-import app.canto.core.KIND_PROJECT
-import app.canto.core.Rec
-import app.canto.core.Snap
-import app.canto.core.StartHint
-import app.canto.core.Step
-import app.canto.core.arm
-import app.canto.core.due
-import app.canto.core.f
-import app.canto.core.finishSnap
-import app.canto.core.pauseSnap
-import app.canto.core.resumeSnap
-import app.canto.core.withSettings
-import app.canto.data.Repo
+import app.presence.core.KIND_GROUP
+import app.presence.core.KIND_PROJECT
+import app.presence.core.Rec
+import app.presence.core.Snap
+import app.presence.core.StartHint
+import app.presence.core.Step
+import app.presence.core.arm
+import app.presence.core.due
+import app.presence.core.f
+import app.presence.core.finishSnap
+import app.presence.core.pauseSnap
+import app.presence.core.resumeSnap
+import app.presence.core.withSettings
+import app.presence.data.Repo
 import java.util.UUID
 
 class TimerCenter(

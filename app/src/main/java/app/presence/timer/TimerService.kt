@@ -1,4 +1,4 @@
-package app.canto.timer
+package app.presence.timer
 
 import android.app.Service
 import android.content.Context
@@ -8,10 +8,10 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import app.canto.CantoApp
-import app.canto.core.Snap
-import app.canto.core.Step
-import app.canto.widget.CantoWidget
+import app.presence.PresenceApp
+import app.presence.core.Snap
+import app.presence.core.Step
+import app.presence.widget.PresenceWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,12 +28,12 @@ class TimerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        val app = application as CantoApp
+        val app = application as PresenceApp
         app.notifier.ensureChannels()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val app = application as CantoApp
+        val app = application as PresenceApp
         startAsForeground(app.notifier.buildOngoing(Snap()))
         scope.launch {
             app.ready.await()
@@ -65,7 +65,7 @@ class TimerService : Service() {
 
     private fun startTick() {
         if (tick?.isActive == true) return
-        val app = application as CantoApp
+        val app = application as PresenceApp
         tick = scope.launch {
             while (isActive) {
                 delay(1000)
@@ -77,7 +77,7 @@ class TimerService : Service() {
                     break
                 }
                 app.center.due(null)
-                CantoWidget.update(this@TimerService)
+                PresenceWidget.update(this@TimerService)
             }
         }
     }
@@ -96,14 +96,14 @@ class TimerService : Service() {
     }
 
     companion object {
-        const val PAUSE = "app.canto.PAUSE"
-        const val RESUME = "app.canto.RESUME"
-        const val STOP = "app.canto.STOP"
-        const val NEXT = "app.canto.NEXT"
-        const val DISMISS = "app.canto.DISMISS"
-        const val DUE = "app.canto.DUE"
-        const val ENSURE = "app.canto.ENSURE"
-        const val CATCHUP = "app.canto.CATCHUP"
+        const val PAUSE = "app.presence.PAUSE"
+        const val RESUME = "app.presence.RESUME"
+        const val STOP = "app.presence.STOP"
+        const val NEXT = "app.presence.NEXT"
+        const val DISMISS = "app.presence.DISMISS"
+        const val DUE = "app.presence.DUE"
+        const val ENSURE = "app.presence.ENSURE"
+        const val CATCHUP = "app.presence.CATCHUP"
         const val EXTRA_TOKEN = "token"
 
         fun ensure(context: Context) {
@@ -118,7 +118,7 @@ class TimerService : Service() {
     }
 }
 
-fun CantoApp.reactTo(step: Step) {
+fun PresenceApp.reactTo(step: Step) {
     notifier.schedule(step.snap)
     val globals = repo.globals()
     val premium = repo.premium()
@@ -140,5 +140,5 @@ fun CantoApp.reactTo(step: Step) {
     } else if (step.chime && step.snap.status == "awaiting") {
         notifier.finished(step.snap)
     }
-    CantoWidget.update(this)
+    PresenceWidget.update(this)
 }

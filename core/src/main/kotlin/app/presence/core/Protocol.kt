@@ -1,4 +1,4 @@
-package app.canto.core
+package app.presence.core
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -112,7 +112,7 @@ class Node(
                     break
                 }
             }
-        }.apply { isDaemon = true; name = "canto-listen"; start() }
+        }.apply { isDaemon = true; name = "presence-listen"; start() }
     }
 
     fun close() {
@@ -285,12 +285,12 @@ fun List<Rec>.forSync(): List<Rec> = filter { it.kind in SYNC_KINDS }
 
 fun encodeBackup(records: List<Rec>): String {
     val items = recordsToJson(records).getJSONArray("items")
-    return JSONObject().put("canto", 1).put("items", items).toString()
+    return JSONObject().put("presence", 1).put("items", items).toString()
 }
 
 fun decodeBackup(text: String): List<Rec>? = try {
     val obj = JSONObject(text)
-    if (obj.optInt("canto") != 1) null
+    if (obj.optInt("presence") != 1) null
     else recordsFromJson(JSONObject().put("t", "records").put("items", obj.getJSONArray("items")))
 } catch (_: Exception) {
     null

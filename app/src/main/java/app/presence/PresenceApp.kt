@@ -1,20 +1,20 @@
-package app.canto
+package app.presence
 
 import android.app.Application
-import app.canto.core.Node
-import app.canto.data.Repo
-import app.canto.sound.Player
-import app.canto.sync.Lan
-import app.canto.timer.Notifier
-import app.canto.timer.TimerCenter
-import app.canto.timer.reactTo
+import app.presence.core.Node
+import app.presence.data.Repo
+import app.presence.sound.Player
+import app.presence.sync.Lan
+import app.presence.timer.Notifier
+import app.presence.timer.TimerCenter
+import app.presence.timer.reactTo
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-class CantoApp : Application() {
+class PresenceApp : Application() {
     lateinit var repo: Repo
     lateinit var center: TimerCenter
     lateinit var player: Player
@@ -40,7 +40,7 @@ class CantoApp : Application() {
             val started = Node(repo) { System.currentTimeMillis() }
             started.start()
             node = started
-            val link = Lan(this@CantoApp, repo, started)
+            val link = Lan(this@PresenceApp, repo, started)
             lan = link
             link.start()
             ready.complete(Unit)

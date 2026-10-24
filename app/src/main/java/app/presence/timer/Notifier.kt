@@ -1,4 +1,4 @@
-package app.canto.timer
+package app.presence.timer
 
 import android.app.AlarmManager
 import android.app.Notification
@@ -9,14 +9,14 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import app.canto.MainActivity
-import app.canto.R
-import app.canto.core.Snap
-import app.canto.core.clockDigits
-import app.canto.core.displayMillis
-import app.canto.core.elapsedWork
-import app.canto.ui.T
-import app.canto.ui.resolveLang
+import app.presence.MainActivity
+import app.presence.R
+import app.presence.core.Snap
+import app.presence.core.clockDigits
+import app.presence.core.displayMillis
+import app.presence.core.elapsedWork
+import app.presence.ui.T
+import app.presence.ui.resolveLang
 
 class Notifier(private val context: Context) {
     private val manager = context.getSystemService(NotificationManager::class.java)
@@ -147,7 +147,7 @@ class Notifier(private val context: Context) {
     }
 
     private fun language(): String {
-        val pref = (context.applicationContext as app.canto.CantoApp).repo.flags()["language"] ?: "system"
+        val pref = (context.applicationContext as app.presence.PresenceApp).repo.flags()["language"] ?: "system"
         return resolveLang(pref)
     }
 
@@ -159,8 +159,8 @@ class Notifier(private val context: Context) {
     }
 
     companion object {
-        const val ONGOING = "canto.ongoing"
-        const val DONE = "canto.done"
+        const val ONGOING = "presence.ongoing"
+        const val DONE = "presence.done"
         const val ONGOING_ID = 7
         const val DONE_ID = 8
     }

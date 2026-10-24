@@ -1,4 +1,4 @@
-package app.canto.ui
+package app.presence.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -61,7 +61,7 @@ private val Type = Typography(
 )
 
 @Composable
-fun CantoTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun PresenceTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = if (dark) Dark else Light, typography = Type, content = content)
 }
 
