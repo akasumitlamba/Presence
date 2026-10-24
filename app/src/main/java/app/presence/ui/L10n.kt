@@ -218,6 +218,61 @@ class T(lang: String) {
     val importHelp = s("Read a Presence file back onto this phone.", "Bir Presence dosyasını bu telefona geri oku.", "Vuelve a leer un archivo de Presence en este teléfono.", "Lê de novo um ficheiro Presence neste telefone.", "Relit un fichier Presence sur ce téléphone.", "Presence のファイルをこの端末に読み戻す。", "Presence 파일을 이 휴대전화로 다시 읽습니다.")
     val pairHelp = s("Link another phone on the same Wi-Fi.", "Aynı Wi-Fi’deki başka bir telefonu bağla.", "Enlaza otro teléfono en el mismo Wi-Fi.", "Liga outro telefone no mesmo Wi-Fi.", "Relie un autre téléphone sur le même Wi-Fi.", "同じ Wi-Fi の別の端末をつなぐ。", "같은 Wi-Fi의 다른 휴대전화를 연결합니다.")
     val start = s("Start", "Başlat", "Empezar", "Começar", "Commencer", "開始", "시작")
+    val decrease = s("Decrease", "Azalt", "Bajar", "Diminuir", "Diminuer", "減らす", "줄이기")
+    val increase = s("Increase", "Artır", "Subir", "Aumentar", "Augmenter", "増やす", "늘리기")
+    val focusModeHelp = s(
+        "Runs a focus, then a short rest, and a long rest after the set number of focuses.",
+        "Bir odak, sonra kısa mola, ayarlanan sayıda odaktan sonra uzun mola.",
+        "Un enfoque, luego un descanso corto y un descanso largo tras los enfoques fijados.",
+        "Um foco, depois uma pausa curta e uma pausa longa após os focos definidos.",
+        "Un focus, puis une pause courte, et une pause longue après le nombre de focus choisi.",
+        "集中のあと小休止。決めた回数のあとに長休止。",
+        "집중 다음 짧은 쉼, 정한 횟수 뒤에 긴 쉼.",
+    )
+    val trackModeHelp = s(
+        "Counts open time on the project. It does not start a rest.",
+        "Projedeki açık süreyi sayar. Mola başlatmaz.",
+        "Cuenta el tiempo abierto del proyecto. No empieza un descanso.",
+        "Conta o tempo aberto no projeto. Não começa uma pausa.",
+        "Compte le temps ouvert sur le projet. N’ouvre pas de pause.",
+        "プロジェクトの時間を数えます。休止は始まりません。",
+        "프로젝트의 열린 시간을 셉니다. 쉼은 시작하지 않습니다.",
+    )
+    val startShort = s("Start short rest", "Kısa molayı başlat", "Empezar descanso corto", "Começar pausa curta", "Lancer la pause courte", "小休止を始める", "짧은 쉼 시작")
+    val startLong = s("Start long rest", "Uzun molayı başlat", "Empezar descanso largo", "Começar pausa longa", "Lancer la pause longue", "長休止を始める", "긴 쉼 시작")
+    val resetSettings = s("Reset settings", "Ayarları sıfırla", "Restablecer ajustes", "Repor ajustes", "Réinitialiser", "設定を戻す", "설정 되돌리기")
+    val resetHelp = s(
+        "Restores durations, theme, day start, and reminder times. Projects, todos, and logged sessions stay.",
+        "Süreleri, temayı, gün başlangıcını ve anımsatma saatlerini geri getirir. Proje, yapılacak ve kayıtlı oturumlar kalır.",
+        "Devuelve duraciones, tema, inicio del día y horas de recordatorio. Proyectos, pendientes y sesiones se quedan.",
+        "Repõe durações, tema, início do dia e horas dos lembretes. Projetos, afazeres e sessões ficam.",
+        "Rend les durées, le thème, le début du jour et les heures de rappel. Projets, tâches et sessions restent.",
+        "長さ、テーマ、一日の始まり、リマインダーの時刻を戻します。プロジェクトと記録は残ります。",
+        "길이, 테마, 하루의 시작, 알림 시각을 되돌립니다. 프로젝트, 할 일, 기록은 남습니다.",
+    )
+    val resetDone = s("Settings restored.", "Ayarlar geri geldi.", "Ajustes restablecidos.", "Ajustes repostos.", "Réglages rendus.", "設定を戻しました。", "설정을 되돌렸습니다.")
+    val colorTheme = s("Color theme", "Renk teması", "Tema de color", "Tema de cor", "Thème de couleur", "色のテーマ", "색 테마")
+    val paletteGrove = s("Grove", "Grove", "Grove", "Grove", "Grove", "Grove", "Grove")
+    val paletteGroveHelp = s("Green, the usual Presence colors.", "Yeşil, Presence’in olağan renkleri.", "Verde, los colores de siempre.", "Verde, as cores de sempre.", "Vert, les couleurs habituelles.", "緑。いつもの色。", "초록, 늘 쓰던 색.")
+    val paletteHarbor = s("Harbor", "Harbor", "Harbor", "Harbor", "Harbor", "Harbor", "Harbor")
+    val paletteHarborHelp = s("A blue theme.", "Mavi bir tema.", "Un tema azul.", "Um tema azul.", "Un thème bleu.", "青のテーマ。", "파란 테마.")
+    val paletteDusk = s("Dusk", "Dusk", "Dusk", "Dusk", "Dusk", "Dusk", "Dusk")
+    val paletteDuskHelp = s("A purple theme.", "Mor bir tema.", "Un tema morado.", "Um tema roxo.", "Un thème violet.", "紫のテーマ。", "보라 테마.")
+    val paletteSlate = s("Slate", "Slate", "Slate", "Slate", "Slate", "Slate", "Slate")
+    val paletteSlateHelp = s("A cool gray theme.", "Soğuk gri bir tema.", "Un tema gris frío.", "Um tema cinza frio.", "Un thème gris froid.", "涼しい灰色のテーマ。", "차가운 회색 테마.")
+    val paletteBerry = s("Berry", "Berry", "Berry", "Berry", "Berry", "Berry", "Berry")
+    val paletteBerryHelp = s("A deep red theme.", "Koyu kırmızı bir tema.", "Un tema rojo oscuro.", "Um tema vermelho escuro.", "Un thème rouge profond.", "深い赤のテーマ。", "짙은 붉은 테마.")
+    val sdCard = s("SD card", "SD card", "SD card", "SD card", "SD card", "SD card", "SD card")
+    val sdNone = s("This phone has no SD card.", "Bu telefonda SD kart yok.", "Este teléfono no tiene tarjeta SD.", "Este telefone não tem cartão SD.", "Ce téléphone n’a pas de carte SD.", "この端末に SD カードはありません。", "이 휴대전화에는 SD 카드가 없습니다.")
+    val sdPresent = s("An SD card is in this phone.", "Bu telefonda SD kart var.", "Hay una tarjeta SD en este teléfono.", "Há um cartão SD neste telefone.", "Une carte SD est dans ce téléphone.", "この端末に SD カードがあります。", "이 휴대전화에 SD 카드가 있습니다.")
+    val sdOnCard = s("An SD card is in this phone, and the database is on it.", "SD kart telefonda ve veritabanı kartta.", "Hay una tarjeta SD y la base de datos está en ella.", "Há um cartão SD e a base de dados está nele.", "Une carte SD est là, et la base est dessus.", "SD カードがあり、データベースはそこにあります。", "SD 카드가 있고 데이터베이스는 그 카드에 있습니다.")
+    val sdMissing = s("The SD card with this data is not in the phone.", "Verinin olduğu SD kart telefonda değil.", "La tarjeta SD con estos datos no está en el teléfono.", "O cartão SD com estes dados não está no telefone.", "La carte SD qui porte ces données n’est pas dans le téléphone.", "このデータがある SD カードは端末にありません。", "이 데이터가 있는 SD 카드가 휴대전화에 없습니다.")
+    val sdMove = s("Store data on the SD card", "Veriyi SD karta taşı", "Guardar los datos en la tarjeta SD", "Guardar os dados no cartão SD", "Mettre les données sur la carte SD", "データを SD カードに置く", "데이터를 SD 카드에 두기")
+    val sdMoveHelp = s("Moves the existing database onto the card.", "Var olan veritabanını karta taşır.", "Mueve la base de datos que ya existe a la tarjeta.", "Move a base de dados existente para o cartão.", "Déplace la base déjà là sur la carte.", "今のデータベースをカードへ移します。", "있는 데이터베이스를 카드로 옮깁니다.")
+    val sdInternal = s("Store data on this phone", "Veriyi bu telefonda tut", "Guardar los datos en este teléfono", "Guardar os dados neste telefone", "Mettre les données sur ce téléphone", "データをこの端末に置く", "데이터를 이 휴대전화에 두기")
+    val sdInternalHelp = s("Moves the database back onto this phone.", "Veritabanını bu telefona geri taşır.", "Vuelve a mover la base de datos a este teléfono.", "Move a base de dados de volta para este telefone.", "Ramène la base sur ce téléphone.", "データベースをこの端末に戻します。", "데이터베이스를 이 휴대전화로 되돌립니다.")
+    val sdFailed = s("The database stayed where it was.", "Veritabanı yerinde kaldı.", "La base de datos se quedó donde estaba.", "A base de dados ficou onde estava.", "La base est restée où elle était.", "データベースはそのままです。", "데이터베이스는 그대로입니다.")
+    val sdCheck = s("Check again", "Yeniden bak", "Comprobar otra vez", "Verificar de novo", "Vérifier encore", "もう一度見る", "다시 확인")
     val streak = s("Streak", "Seri", "Racha", "Sequência", "Série", "連続", "연속")
 
     fun streakLine(count: Int, logged: Boolean): String = when {

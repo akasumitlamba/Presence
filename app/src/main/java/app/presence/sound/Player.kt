@@ -6,6 +6,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.MediaPlayer
 import app.presence.core.Tones
+import app.presence.data.AppStorage
 import java.io.File
 
 class Player(private val context: Context) {
@@ -55,7 +56,7 @@ class Player(private val context: Context) {
         alarm = null
         media?.release()
         media = null
-        val custom = File(context.filesDir, "alarm-custom")
+        val custom = File(AppStorage.privateDir(context), "alarm-custom")
         if (kind == "custom" && custom.exists()) {
             try {
                 val player = MediaPlayer()

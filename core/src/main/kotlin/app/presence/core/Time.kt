@@ -460,6 +460,46 @@ fun finishSnap(
     return Step(idleBase, listOf(closed), alarm = false, chime = chime)
 }
 
+fun beginRest(
+    snap: Snap,
+    restKind: String,
+    nowEpoch: Long,
+    nowElapsed: Long,
+    nextSessionId: String,
+    nextToken: String,
+): Step {
+    if (restKind != "short" && restKind != "long") return Step(snap, emptyList(), false, false)
+    if (snap.kind == restKind) return Step(snap, emptyList(), false, false)
+    if (snap.status != "running" && snap.status != "paused") return Step(snap, emptyList(), false, false)
+    if (snap.sessionId == null) return Step(snap, emptyList(), false, false)
+    val worked = elapsedWork(snap, nowEpoch, nowElapsed)
+    val keep = worked >= MIN_KEEP_MS
+    val closed = closeOf(snap, nowEpoch, nowElapsed, keep)
+    val done = when {
+        snap.kind == "focus" && restKind == "long" -> 0
+        snap.kind == "focus" -> snap.focusDone + 1
+        else -> snap.focusDone
+    }
+    val hint = StartHint(
+        snap.projectId,
+        snap.projectName,
+        snap.groupName,
+        snap.taskId,
+        snap.taskTitle,
+        snap.writerId,
+        nextSessionId,
+        nextToken,
+    )
+    val armed = arm(
+        snap.copy(status = "idle", awaitingKind = "", focusDone = done, sessionId = null),
+        restKind,
+        nowEpoch,
+        nowElapsed,
+        hint,
+    )
+    return Step(armed.snap.copy(focusDone = done), listOf(closed) + armed.writes, alarm = true, chime = false)
+}
+
 fun withSettings(snap: Snap, focus: Int, short: Int, long: Int, cycles: Int, countUp: Boolean, auto: Boolean): Snap {
     if (snap.status == "running" || snap.status == "paused") {
         return snap.copy(autoStart = auto)

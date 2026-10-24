@@ -31,12 +31,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -49,6 +51,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -83,6 +86,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -97,6 +101,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import app.presence.MainActivity
 import app.presence.PresenceApp
+import app.presence.data.AppStorage
 import app.presence.timer.Reminders
 import app.presence.widget.HomeWidgets
 import app.presence.core.FREE_PROJECTS
@@ -171,6 +176,7 @@ fun PresenceRoot() {
         "light" -> false
         else -> androidx.compose.foundation.isSystemInDarkTheme()
     }
+    val palette = flags["palette"] ?: "grove"
     val scale = when (flags["text"]) {
         "compact" -> 0.9f
         "large" -> 1.16f
@@ -181,7 +187,7 @@ fun PresenceRoot() {
     androidx.compose.runtime.CompositionLocalProvider(
         LocalDensity provides Density(density.density * scale, density.fontScale * scale),
     ) {
-        PresenceTheme(dark) {
+        PresenceTheme(dark, palette) {
             Shell(app, rows, t, premium, wide)
         }
     }
@@ -324,8 +330,10 @@ private fun TimerPage(
 ) {
     val context = LocalContext.current
     val projects = rows.alive(KIND_PROJECT).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
+    val groups = rows.alive(KIND_GROUP).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
     val free = freeProjectIds(rows.alive(KIND_PROJECT))
     var selected by remember { mutableStateOf(snap.projectId) }
+    var creating by remember { mutableStateOf(false) }
     var taskId by remember { mutableStateOf(snap.taskId) }
     var pending by remember { mutableStateOf<Rec?>(null) }
     val project = projects.find { it.id == selected }
@@ -352,19 +360,27 @@ private fun TimerPage(
     val notificationsOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
     val controls: @Composable () -> Unit = {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                projects.forEach { item ->
-                    val locked = !premium && item.id !in free
-                    PresenceChip(
-                        selected = item.id == selected,
-                        onClick = {
-                            if (locked) onGate() else {
-                                selected = item.id
-                                taskId = null
-                            }
-                        },
-                        label = { Text(if (locked) item.f("name") + " · " + t.locked else item.f("name")) },
-                    )
+            if (projects.isEmpty()) {
+                Text(t.emptyProjects, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+                PresenceButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.newProject) }
+            } else {
+                if (project == null && snap.status == "idle") {
+                    Text(t.chooseProject, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    projects.forEach { item ->
+                        val locked = !premium && item.id !in free
+                        PresenceChip(
+                            selected = item.id == selected,
+                            onClick = {
+                                if (locked) onGate() else {
+                                    selected = item.id
+                                    taskId = null
+                                }
+                            },
+                            label = { Text(if (locked) item.f("name") + " · " + t.locked else item.f("name")) },
+                        )
+                    }
                 }
             }
             if (tasks.isNotEmpty()) {
@@ -374,28 +390,43 @@ private fun TimerPage(
                     }
                 }
             }
+            if (snap.status == "idle") {
+                Text(t.focusModeHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Text(t.trackModeHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            }
+            val canBegin = project != null
             PresenceButton(onClick = {
                 when (snap.status) {
                     "running" -> app.center.pause()
                     "paused" -> app.center.resume()
                     "awaiting" -> app.center.start(snap.awaitingKind.ifEmpty { "focus" }, project, task)
                     else -> {
-                        if (project != null && !premium && project.id !in free) onGate()
-                        else app.center.start("focus", project, task)
+                        val chosen = project
+                        if (chosen != null) {
+                            if (!premium && chosen.id !in free) onGate()
+                            else app.center.start("focus", chosen, task)
+                        }
                     }
                 }
-            }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(primary) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (snap.status == "idle") {
-                    TonalButton(onClick = {
-                        if (project != null && !premium && project.id !in free) onGate() else app.center.start("track", project, task)
-                    }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
-                }
-                if (snap.status == "running" || snap.status == "paused") {
+            }, enabled = snap.status == "running" || snap.status == "paused" || snap.status == "awaiting" || canBegin, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(primary) }
+            if (snap.status == "idle") {
+                TonalButton(onClick = {
+                    val chosen = project
+                    if (chosen != null) {
+                        if (!premium && chosen.id !in free) onGate() else app.center.start("track", chosen, task)
+                    }
+                }, enabled = canBegin, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.trackTime) }
+            }
+            if (snap.status == "running" || snap.status == "paused") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TonalButton(onClick = { app.center.stop() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.stop) }
                     if (snap.kind != "track") {
                         TonalButton(onClick = { app.center.skip() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.skip) }
                     }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TonalButton(onClick = { app.center.beginRest("short") }, enabled = snap.kind != "short", modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.startShort) }
+                    TonalButton(onClick = { app.center.beginRest("long") }, enabled = snap.kind != "long", modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.startLong) }
                 }
             }
             if (snap.status == "running" || snap.status == "paused" || snap.status == "awaiting") {
@@ -438,6 +469,34 @@ private fun TimerPage(
             app.center.stop()
             if (next != null) app.center.start("track", next, null)
         }, { pending = null })
+    }
+    if (creating) {
+        ProjectDialog(t, groups, { creating = false }) { name, color, groupId ->
+            creating = false
+            val id = UUID.randomUUID().toString()
+            app.repo.put(
+                app.repo.writerNow(
+                    KIND_PROJECT,
+                    id,
+                    mapOf(
+                        "name" to name,
+                        "color" to color,
+                        "groupId" to groupId,
+                        "goalMinutes" to "",
+                        "goalDeadline" to "",
+                        "focus" to "",
+                        "short" to "",
+                        "long" to "",
+                        "cycles" to "",
+                        "countUp" to "",
+                        "sort" to ((projects.maxOfOrNull { it.f("sort").toIntOrNull() ?: 0 } ?: 0) + 1).toString(),
+                        "tags" to "",
+                        "createdAt" to System.currentTimeMillis().toString(),
+                    ),
+                ),
+            )
+            selected = id
+        }
     }
 }
 
@@ -1121,8 +1180,8 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
                 projects.forEach { item ->
                     PresenceChip(selected = project == item.id, onClick = { project = item.id }, label = { Text(item.f("name")) })
                 }
-                CountStepper(t.hours, hours, 0, 12) { hours = it }
-                CountStepper(t.minutes, mins, 0, 59) { mins = it }
+                CountStepper(t, t.hours, hours, 0, 12) { hours = it }
+                CountStepper(t, t.minutes, mins, 0, 59) { mins = it }
                 Row {
                     PresenceChip(selected = kind == "focus", onClick = { kind = "focus" }, label = { Text(t.focus) })
                     Spacer(Modifier.width(8.dp))
@@ -1348,7 +1407,7 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             context.contentResolver.openInputStream(uri)?.use { input ->
-                java.io.File(context.filesDir, "alarm-custom").outputStream().use { output -> input.copyTo(output) }
+                java.io.File(AppStorage.privateDir(context), "alarm-custom").outputStream().use { output -> input.copyTo(output) }
             }
             app.repo.setPref("alarm", "custom")
         }
@@ -1362,17 +1421,53 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
         }
     }
     val theme = flags["theme"] ?: "system"
+    val palette = flags["palette"] ?: "grove"
     val textSize = flags["text"] ?: "standard"
     val language = flags["language"] ?: "system"
+    val storage by app.repo.storage().collectAsState()
+    LaunchedEffect(Unit) { app.repo.refreshStorage() }
+    val storagePane: @Composable () -> Unit = {
+        Text(t.sdCard, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        val storageBody = when {
+            storage.cardMissing -> t.sdMissing
+            storage.onCard -> t.sdOnCard
+            storage.cardPresent -> t.sdPresent
+            else -> t.sdNone
+        }
+        Text(storageBody, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+        if (storage.cardPresent && !storage.onCard && !storage.cardMissing) {
+            Text(t.sdMoveHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            PresenceButton(onClick = {
+                note = when (app.repo.moveToSd()) {
+                    "moved" -> t.sdOnCard
+                    "no-card" -> t.sdNone
+                    "missing" -> t.sdMissing
+                    else -> t.sdFailed
+                }
+            }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.sdMove) }
+        }
+        if (storage.onCard && storage.cardPresent) {
+            Text(t.sdInternalHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            PresenceButton(onClick = {
+                note = when (app.repo.moveToInternal()) {
+                    "moved" -> t.sdPresent
+                    else -> t.sdFailed
+                }
+            }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.sdInternal) }
+        }
+        if (storage.cardMissing) {
+            PresenceButton(onClick = { app.repo.refreshStorage() }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.sdCheck) }
+        }
+    }
     val timerPane: @Composable () -> Unit = {
         Text(t.timerSettings, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        Stepper(t.focusLen, t.focusHelp, globals.focus, 1, 180) { app.repo.setPref("focus_min", it.toString()); app.center.refreshSettings() }
-        Stepper(t.shortLen, t.shortHelp, globals.short, 1, 60) { app.repo.setPref("short_min", it.toString()); app.center.refreshSettings() }
-        Stepper(t.longLen, t.longHelp, globals.long, 1, 120) { app.repo.setPref("long_min", it.toString()); app.center.refreshSettings() }
-        Stepper(t.cycles, t.cyclesHelp, globals.cycles, 1, 12) { app.repo.setPref("cycles", it.toString()); app.center.refreshSettings() }
+        Stepper(t, t.focusLen, t.focusHelp, globals.focus, 1, 180) { app.repo.setPref("focus_min", it.toString()); app.center.refreshSettings() }
+        Stepper(t, t.shortLen, t.shortHelp, globals.short, 1, 60) { app.repo.setPref("short_min", it.toString()); app.center.refreshSettings() }
+        Stepper(t, t.longLen, t.longHelp, globals.long, 1, 120) { app.repo.setPref("long_min", it.toString()); app.center.refreshSettings() }
+        Stepper(t, t.cycles, t.cyclesHelp, globals.cycles, 1, 12) { app.repo.setPref("cycles", it.toString()); app.center.refreshSettings() }
         SwitchSetting(t.countUp, t.countUpHelp, globals.countUp) { app.repo.setPref("count_up", if (it) "1" else "0"); app.center.refreshSettings() }
         SwitchSetting(t.autoContinue, t.autoHelp, globals.auto) { app.repo.setPref("auto_start", if (it) "1" else "0"); app.center.refreshSettings() }
-        Stepper(t.dayStarts, t.dayHelp, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
+        Stepper(t, t.dayStarts, t.dayHelp, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
         Text(t.reminders, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         ReminderRow(t.dailyReminder, t.dailyHelp, globals.dailyOn, globals.dailyHour, globals.dailyMinute, { on ->
             if (on) askNotify()
@@ -1392,12 +1487,26 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             app.repo.setPref("streak_minute", minute.toString())
             Reminders.reschedule(context)
         }
+        Setting(t.resetSettings, t.resetHelp) {
+            PresenceButton(onClick = {
+                app.repo.resetSettings()
+                app.center.refreshSettings()
+                Reminders.reschedule(context)
+                note = t.resetDone
+            }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(t.resetSettings) }
+        }
     }
     val otherPane: @Composable () -> Unit = {
         Text(t.appearance, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         ChoiceRow(t.light, t.lightHelp, theme == "light") { app.repo.updateFlags { it["theme"] = "light" } }
         ChoiceRow(t.dark, t.darkHelp, theme == "dark") { app.repo.updateFlags { it["theme"] = "dark" } }
         ChoiceRow(t.followSystem, t.followHelp, theme == "system") { app.repo.updateFlags { it["theme"] = "system" } }
+        Text(t.colorTheme, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        ChoiceRow(t.paletteGrove, t.paletteGroveHelp, palette == "grove") { app.repo.updateFlags { it["palette"] = "grove" } }
+        ChoiceRow(t.paletteHarbor, t.paletteHarborHelp, palette == "harbor") { app.repo.updateFlags { it["palette"] = "harbor" } }
+        ChoiceRow(t.paletteDusk, t.paletteDuskHelp, palette == "dusk") { app.repo.updateFlags { it["palette"] = "dusk" } }
+        ChoiceRow(t.paletteSlate, t.paletteSlateHelp, palette == "slate") { app.repo.updateFlags { it["palette"] = "slate" } }
+        ChoiceRow(t.paletteBerry, t.paletteBerryHelp, palette == "berry") { app.repo.updateFlags { it["palette"] = "berry" } }
         Text(t.textSize, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         ChoiceRow(t.compact, t.compactHelp, textSize == "compact") { app.repo.updateFlags { it["text"] = "compact" } }
         ChoiceRow(t.standard, t.standardHelp, textSize == "standard") { app.repo.updateFlags { it["text"] = "standard" } }
@@ -1426,7 +1535,7 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
         ChoiceRow(t.rain, t.rainHelp, globals.background == "rain") { app.repo.setPref("background", "rain") }
         ChoiceRow(t.brook, t.brookHelp, globals.background == "brook") { app.repo.setPref("background", "brook") }
         ChoiceRow(t.hearth, t.hearthHelp, globals.background == "hearth") { app.repo.setPref("background", "hearth") }
-        Stepper(t.volume, t.volumeHelp, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()) }
+        Stepper(t, t.volume, t.volumeHelp, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()) }
         Text(t.data, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         Setting(t.exportJson, t.exportJsonHelp) {
             PresenceButton(onClick = { exportJson.launch("presence-backup.json") }, modifier = Modifier.fillMaxWidth()) { Text(t.exportJson) }
@@ -1450,7 +1559,10 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) { timerPane() }
+            ) {
+                storagePane()
+                timerPane()
+            }
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -1461,6 +1573,7 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            storagePane()
             timerPane()
             otherPane()
         }
@@ -1561,14 +1674,20 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
 }
 
 @Composable
-private fun Stepper(title: String, help: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
+private fun Stepper(t: T, title: String, help: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         Text(help, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TonalButton(onClick = { if (value > min) onChange(value - 1) }, enabled = value > min, modifier = Modifier.size(48.dp)) { Text("–") }
+            TonalButton(
+                onClick = { if (value > min) onChange(value - 1) },
+                enabled = value > min,
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(0.dp),
+            ) { Icon(Icons.Filled.Remove, contentDescription = t.decrease) }
             Text(
                 value.toString(),
                 modifier = Modifier.widthIn(min = 36.dp),
@@ -1576,23 +1695,41 @@ private fun Stepper(title: String, help: String, value: Int, min: Int, max: Int,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.titleLarge,
             )
-            TonalButton(onClick = { if (value < max) onChange(value + 1) }, enabled = value < max, modifier = Modifier.size(48.dp)) { Text("+") }
+            TonalButton(
+                onClick = { if (value < max) onChange(value + 1) },
+                enabled = value < max,
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(0.dp),
+            ) { Icon(Icons.Filled.Add, contentDescription = t.increase) }
         }
     }
 }
 
 @Composable
-private fun CountStepper(label: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
+private fun CountStepper(t: T, label: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
-        TonalButton(onClick = { if (value > min) onChange(value - 1) }, enabled = value > min, modifier = Modifier.size(48.dp)) { Text("–") }
+        TonalButton(
+            onClick = { if (value > min) onChange(value - 1) },
+            enabled = value > min,
+            modifier = Modifier.size(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(0.dp),
+        ) { Icon(Icons.Filled.Remove, contentDescription = t.decrease) }
         Text(
             value.toString(),
             modifier = Modifier.widthIn(min = 36.dp),
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
-        TonalButton(onClick = { if (value < max) onChange(value + 1) }, enabled = value < max, modifier = Modifier.size(48.dp)) { Text("+") }
+        TonalButton(
+            onClick = { if (value < max) onChange(value + 1) },
+            enabled = value < max,
+            modifier = Modifier.size(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(0.dp),
+        ) { Icon(Icons.Filled.Add, contentDescription = t.increase) }
     }
 }
 
@@ -1619,12 +1756,16 @@ private fun TonalButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    shape: Shape = ButtonDefaults.shape,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
     FilledTonalButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        shape = shape,
+        contentPadding = contentPadding,
         colors = presenceTonalColors(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         content = content,
@@ -1736,8 +1877,8 @@ private fun GoalDialog(t: T, onClose: () -> Unit, onSave: (Int, Long) -> Unit) {
         title = { Text(t.setGoal) },
         text = {
             Column {
-                CountStepper(t.hours, hours, 0, 10000) { hours = it }
-                CountStepper(t.minutes, mins, 0, 59) { mins = it }
+                CountStepper(t, t.hours, hours, 0, 10000) { hours = it }
+                CountStepper(t, t.minutes, mins, 0, 59) { mins = it }
                 TextButton(onClick = {
                     DatePickerDialog(context, { _, y, m, d -> deadline = LocalDate.of(y, m + 1, d) }, deadline.year, deadline.monthValue - 1, deadline.dayOfMonth).show()
                 }) { Text(t.deadline + " · " + deadline) }

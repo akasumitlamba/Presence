@@ -164,6 +164,53 @@ class CoreTest {
     }
 
     @Test
+    fun trackFinishReturnsIdleWithoutARest() {
+        val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
+        val armed = arm(Snap(focusMin = 25, cycles = 4, focusDone = 2), "track", 1_000, 1_000, hint)
+        assertFalse(due(armed.snap, 1_000 + 60_000, 1_000 + 60_000))
+        val stopped = finishSnap(armed.snap, 1_000 + 10_000, 1_000 + 10_000, "stop", "n", "t")
+        assertEquals("idle", stopped.snap.status)
+        assertEquals("", stopped.snap.awaitingKind)
+        assertEquals("focus", stopped.snap.kind)
+        assertEquals(0, stopped.snap.focusDone)
+        assertFalse(stopped.writes.single().deleted)
+    }
+
+    @Test
+    fun beginRestFromFocusStartsShortImmediately() {
+        val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
+        val armed = arm(Snap(focusMin = 25, cycles = 4), "focus", 1_000, 1_000, hint)
+        val rest = beginRest(armed.snap, "short", 1_000 + 10_000, 1_000 + 10_000, "next", "tok2")
+        assertEquals("running", rest.snap.status)
+        assertEquals("short", rest.snap.kind)
+        assertEquals(1, rest.snap.focusDone)
+        assertTrue(rest.alarm)
+        assertFalse(rest.chime)
+        assertEquals(2, rest.writes.size)
+        assertFalse(rest.writes.first().deleted)
+    }
+
+    @Test
+    fun beginRestLongResetsFocusDone() {
+        val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
+        val armed = arm(Snap(focusMin = 25, cycles = 4, focusDone = 3), "focus", 1_000, 1_000, hint)
+        val rest = beginRest(armed.snap, "long", 1_000 + 10_000, 1_000 + 10_000, "next", "tok2")
+        assertEquals("running", rest.snap.status)
+        assertEquals("long", rest.snap.kind)
+        assertEquals(0, rest.snap.focusDone)
+    }
+
+    @Test
+    fun beginRestFromTrackDoesNotCountAFocus() {
+        val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
+        val armed = arm(Snap(focusMin = 25, cycles = 4, focusDone = 2), "track", 1_000, 1_000, hint)
+        val rest = beginRest(armed.snap, "short", 1_000 + 10_000, 1_000 + 10_000, "next", "tok2")
+        assertEquals("running", rest.snap.status)
+        assertEquals("short", rest.snap.kind)
+        assertEquals(2, rest.snap.focusDone)
+    }
+
+    @Test
     fun rebootUsesTheWallClock() {
         val hint = StartHint(null, "", "", null, "", "phone", "sess", "tok")
         val armed = arm(Snap(focusMin = 25), "focus", 5_000, 5_000, hint)

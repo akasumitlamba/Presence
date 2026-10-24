@@ -132,7 +132,7 @@ fun PresenceApp.reactTo(step: Step) {
     notifier.schedule(step.snap)
     val globals = repo.globals()
     val alarmKind = when {
-        globals.alarm == "custom" && !java.io.File(filesDir, "alarm-custom").exists() -> "chime"
+        globals.alarm == "custom" && !java.io.File(app.presence.data.AppStorage.privateDir(this), "alarm-custom").exists() -> "chime"
         else -> globals.alarm
     }
     if (step.chime) player.alarm(alarmKind)

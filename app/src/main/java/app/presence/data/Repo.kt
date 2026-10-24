@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package app.presence.data
 
 import android.content.Context
@@ -26,6 +28,11 @@ import app.presence.core.toFields
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 
@@ -97,16 +104,80 @@ data class Globals(
 data class Todo(val id: String, val title: String, val done: Boolean, val sort: Long)
 
 class Repo(private val context: Context) : Catalog {
-    private val db = Room.databaseBuilder(context.applicationContext, PresenceDb::class.java, "presence.db")
-        .allowMainThreadQueries()
-        .build()
-    private val dao = db.recs()
+    @Volatile private var db: PresenceDb? = null
+    @Volatile private var dao: RecDao? = null
     private val lock = Any()
+    private val generation = MutableStateFlow(0)
+    private val storageState = MutableStateFlow(StorageStatus())
+    private val rowsFlow: Flow<List<Rec>> = generation.flatMapLatest {
+        val current = dao
+        if (current == null) {
+            flowOf(emptyList())
+        } else {
+            current.observe().map { rows -> rows.map { it.toRec() } }.catch { emit(emptyList()) }
+        }
+    }
 
-    fun observe(): Flow<List<Rec>> = dao.observe().map { rows -> rows.map { it.toRec() } }
+    fun observe(): Flow<List<Rec>> = rowsFlow
+
+    fun storage(): StateFlow<StorageStatus> = storageState
 
     fun open() {
         synchronized(lock) {
+            if (!attachLocked()) {
+                publishLocked()
+                generation.value = generation.value + 1
+                return
+            }
+            seedLocked()
+            publishLocked()
+            generation.value = generation.value + 1
+        }
+    }
+
+    fun refreshStorage() {
+        synchronized(lock) {
+            val missing = readStatus().cardMissing
+            if (missing && attachLocked()) seedLocked()
+            publishLocked()
+            if (missing && dao != null) generation.value = generation.value + 1
+        }
+    }
+
+    fun moveToSd(): String = relocate(true)
+
+    fun moveToInternal(): String = relocate(false)
+
+    fun resetSettings() {
+        synchronized(lock) {
+            val dao = dao ?: return
+            val now = System.currentTimeMillis()
+            val writer = deviceIdLocked()
+            val prefs = listOf(
+                "focus_min" to "25",
+                "short_min" to "5",
+                "long_min" to "15",
+                "cycles" to "4",
+                "day_start" to "0",
+                "daily_hour" to "9",
+                "daily_minute" to "0",
+                "streak_hour" to "20",
+                "streak_minute" to "0",
+            )
+            dao.upsert(
+                prefs.map { (key, value) ->
+                    Rec(KIND_PREF, key, now, writer, false, mapOf("value" to value)).toEntity()
+                },
+            )
+            val map = (dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.toRec()?.body ?: emptyMap()).toMutableMap()
+            map["theme"] = "system"
+            map["palette"] = "grove"
+            dao.upsert(listOf(Rec(KIND_LOCAL, "flags", now, writer, false, map).toEntity()))
+        }
+    }
+
+    private fun seedLocked() {
+        val dao = dao ?: return
             val rows = dao.all().map { it.toRec() }
             val now = System.currentTimeMillis()
             if (rows.none { it.kind == KIND_LOCAL && it.id == "device" }) {
@@ -159,36 +230,48 @@ class Repo(private val context: Context) : Catalog {
                             now,
                             writer,
                             false,
-                            mapOf("premium" to "0", "theme" to "system", "text" to "standard", "language" to "system"),
+                            mapOf("premium" to "0", "theme" to "system", "text" to "standard", "language" to "system", "palette" to "grove"),
                         ).toEntity(),
                     ),
                 )
             }
-        }
+            val flagsRow = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.toRec()
+            if (flagsRow != null && flagsRow.f("palette").isEmpty()) {
+                val body = flagsRow.body.toMutableMap()
+                body["palette"] = "grove"
+                dao.upsert(listOf(flagsRow.copy(updatedAt = now, body = body).toEntity()))
+            }
     }
 
     override fun deviceId(): String = synchronized(lock) { deviceIdLocked() }
 
     override fun deviceName(): String = synchronized(lock) {
+        val dao = dao ?: return "Presence"
         dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "device" }?.toRec()?.f("name")?.ifEmpty { "Presence" } ?: "Presence"
     }
 
     fun setDeviceName(name: String) {
         synchronized(lock) {
+            val dao = dao ?: return
             val id = deviceIdLocked()
             dao.upsert(listOf(Rec(KIND_LOCAL, "device", System.currentTimeMillis(), id, false, mapOf("id" to id, "name" to name)).toEntity()))
         }
     }
 
-    override fun snapshot(): List<Rec> = synchronized(lock) { dao.all().map { it.toRec() } }
+    override fun snapshot(): List<Rec> = synchronized(lock) {
+        val dao = dao ?: return emptyList()
+        dao.all().map { it.toRec() }
+    }
 
     override fun tokenFor(deviceId: String): String? = synchronized(lock) {
+        val dao = dao ?: return null
         val row = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "peer:$deviceId" && !it.deleted }?.toRec()
         row?.f("token")?.ifEmpty { null }
     }
 
     override fun rememberPeer(deviceId: String, name: String, token: String) {
         synchronized(lock) {
+            val dao = dao ?: return
             val now = System.currentTimeMillis()
             dao.upsert(
                 listOf(
@@ -207,6 +290,7 @@ class Repo(private val context: Context) : Catalog {
 
     fun touchPeer(deviceId: String) {
         synchronized(lock) {
+            val dao = dao ?: return
             val row = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "peer:$deviceId" && !it.deleted }?.toRec() ?: return
             val now = System.currentTimeMillis()
             val body = row.body.toMutableMap()
@@ -217,6 +301,7 @@ class Repo(private val context: Context) : Catalog {
 
     fun forgetPeer(deviceId: String) {
         synchronized(lock) {
+            val dao = dao ?: return
             dao.upsert(
                 listOf(
                     Rec(KIND_LOCAL, "peer:$deviceId", System.currentTimeMillis(), deviceIdLocked(), true, emptyMap()).toEntity(),
@@ -226,6 +311,7 @@ class Repo(private val context: Context) : Catalog {
     }
 
     fun peers(): List<Peer> = synchronized(lock) {
+        val dao = dao ?: return emptyList()
         dao.all().map { it.toRec() }
             .filter { it.kind == KIND_LOCAL && it.id.startsWith("peer:") && !it.deleted && it.f("token").isNotEmpty() }
             .map { Peer(it.id.removePrefix("peer:"), it.f("name").ifEmpty { "Presence" }, it.f("token"), it.f("lastSync").toLongOrNull() ?: 0L) }
@@ -233,6 +319,7 @@ class Repo(private val context: Context) : Catalog {
 
     override fun mergeFrom(incoming: List<Rec>) {
         synchronized(lock) {
+            val dao = dao ?: return
             val local = dao.all().map { it.toRec() }
             val snap = local.firstOrNull { it.kind == KIND_LOCAL && it.id == "snapshot" && !it.deleted }?.let { snapFrom(it.body) } ?: Snap()
             val busy = snap.status == "running" || snap.status == "paused"
@@ -243,7 +330,7 @@ class Repo(private val context: Context) : Catalog {
                 if (busy) TIMER_PREF_IDS else emptySet(),
             )
             val alarm = merged.find { it.kind == KIND_PREF && it.id == "alarm" }
-            if (alarm?.f("value") == "custom" && !File(context.filesDir, "alarm-custom").exists()) {
+            if (alarm?.f("value") == "custom" && !File(AppStorage.privateDir(context), "alarm-custom").exists()) {
                 val previous = local.find { it.kind == KIND_PREF && it.id == "alarm" }
                     ?: Rec(KIND_PREF, "alarm", 0, deviceIdLocked(), false, mapOf("value" to "chime"))
                 merged = merged.map { if (it.kind == KIND_PREF && it.id == "alarm") previous else it }
@@ -257,28 +344,35 @@ class Repo(private val context: Context) : Catalog {
 
     fun putAll(records: List<Rec>) {
         if (records.isEmpty()) return
-        synchronized(lock) { dao.upsert(records.map { it.toEntity() }) }
+        synchronized(lock) {
+            val dao = dao ?: return
+            dao.upsert(records.map { it.toEntity() })
+        }
     }
 
     fun put(rec: Rec) = putAll(listOf(rec))
 
     fun currentSnap(): Snap = synchronized(lock) {
+        val dao = dao ?: return Snap()
         val row = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "snapshot" && !it.deleted } ?: return Snap()
         snapFrom(row.toRec().body)
     }
 
     fun saveSnap(snap: Snap) {
         synchronized(lock) {
+            val dao = dao ?: return
             dao.upsert(listOf(Rec(KIND_LOCAL, "snapshot", System.currentTimeMillis(), deviceIdLocked(), false, snap.toFields()).toEntity()))
         }
     }
 
     fun flags(): Map<String, String> = synchronized(lock) {
+        val dao = dao ?: return emptyMap()
         dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.toRec()?.body ?: emptyMap()
     }
 
     fun updateFlags(block: (MutableMap<String, String>) -> Unit) {
         synchronized(lock) {
+            val dao = dao ?: return
             val map = (dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.toRec()?.body ?: emptyMap()).toMutableMap()
             block(map)
             dao.upsert(listOf(Rec(KIND_LOCAL, "flags", System.currentTimeMillis(), deviceIdLocked(), false, map).toEntity()))
@@ -288,6 +382,7 @@ class Repo(private val context: Context) : Catalog {
     fun premium(): Boolean = true
 
     fun todos(): List<Todo> = synchronized(lock) {
+        val dao = dao ?: return emptyList()
         dao.all().map { it.toRec() }
             .filter { it.kind == KIND_LOCAL && it.id.startsWith("todo:") && !it.deleted }
             .map {
@@ -311,6 +406,7 @@ class Repo(private val context: Context) : Catalog {
 
     fun setTodoDone(id: String, done: Boolean) {
         synchronized(lock) {
+            val dao = dao ?: return
             val row = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "todo:$id" }?.toRec() ?: return
             val body = row.body.toMutableMap()
             body["done"] = if (done) "1" else "0"
@@ -320,12 +416,14 @@ class Repo(private val context: Context) : Catalog {
 
     fun deleteTodo(id: String) {
         synchronized(lock) {
+            val dao = dao ?: return
             val row = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "todo:$id" }?.toRec() ?: return
             dao.upsert(listOf(row.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = deviceIdLocked()).toEntity()))
         }
     }
 
     fun globals(): Globals = synchronized(lock) {
+        val dao = dao ?: return Globals(25, 5, 15, 4, false, false, 0, "chime", "off", 40, false, 9, 0, false, 20, 0)
         val prefs = dao.all().filter { it.kind == KIND_PREF }.associate { it.id to it.toRec().f("value") }
         fun n(key: String, fallback: Int) = prefs[key]?.toIntOrNull() ?: fallback
         Globals(
@@ -350,6 +448,7 @@ class Repo(private val context: Context) : Catalog {
 
     fun setPref(key: String, value: String) {
         synchronized(lock) {
+            val dao = dao ?: return
             dao.upsert(listOf(Rec(KIND_PREF, key, System.currentTimeMillis(), deviceIdLocked(), false, mapOf("value" to value)).toEntity()))
         }
     }
@@ -359,6 +458,164 @@ class Repo(private val context: Context) : Catalog {
     }
 
     private fun deviceIdLocked(): String {
+        val dao = dao ?: return "device"
         return dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "device" }?.toRec()?.f("id") ?: "device"
+    }
+
+    private fun attachLocked(): Boolean {
+        val stored = AppStorage.prefs(context)
+        val location = stored.getString(AppStorage.LOCATION, "internal")
+        if (location == "sd") {
+            val path = stored.getString(AppStorage.DB_PATH, null)
+            val file = if (path.isNullOrEmpty()) null else File(path)
+            if (file == null || !file.exists()) {
+                closeLocked()
+                return false
+            }
+            if (db != null && dao != null) return true
+            closeLocked()
+            openDatabase(file.absolutePath)
+            return dao != null
+        }
+        if (db != null && dao != null) return true
+        openDatabase(internalDb().absolutePath)
+        return dao != null
+    }
+
+    private fun relocate(toCard: Boolean): String {
+        synchronized(lock) {
+            val card = AppStorage.removableDir(context)
+            if (toCard && card == null) {
+                publishLocked()
+                return "no-card"
+            }
+            val database = db
+            val current = dao
+            if (database == null || current == null) {
+                publishLocked()
+                return "missing"
+            }
+            val source = activeDbFile()
+            val destRoot = if (toCard) card else null
+            if (toCard && destRoot == null) return "no-card"
+            val dest = if (destRoot != null) File(destRoot, "presence.db") else internalDb()
+            val destFiles = if (destRoot != null) File(destRoot, "files") else context.filesDir
+            if (source.absolutePath == dest.absolutePath) return "same"
+            dest.parentFile?.mkdirs()
+            destFiles.mkdirs()
+            try {
+                database.openHelper.writableDatabase.query(androidx.sqlite.db.SimpleSQLiteQuery("PRAGMA wal_checkpoint(FULL)")).close()
+            } catch (_: Exception) {
+            }
+            closeLocked()
+            if (!copyDb(source, dest)) {
+                openDatabase(source.absolutePath)
+                publishLocked()
+                generation.value = generation.value + 1
+                return "failed"
+            }
+            try {
+                openDatabase(dest.absolutePath)
+                dao?.all() ?: error("closed")
+            } catch (_: Exception) {
+                closeLocked()
+                dest.delete()
+                File(dest.absolutePath + "-wal").delete()
+                File(dest.absolutePath + "-shm").delete()
+                openDatabase(source.absolutePath)
+                publishLocked()
+                generation.value = generation.value + 1
+                return "failed"
+            }
+            deleteDb(source)
+            copyPrivateFiles(AppStorage.privateDir(context), destFiles)
+            AppStorage.prefs(context).edit()
+                .putString(AppStorage.LOCATION, if (toCard) "sd" else "internal")
+                .putString(AppStorage.DB_PATH, dest.absolutePath)
+                .putString(AppStorage.FILES_PATH, destFiles.absolutePath)
+                .apply()
+            publishLocked()
+            generation.value = generation.value + 1
+            return "moved"
+        }
+    }
+
+    private fun activeDbFile(): File {
+        val path = AppStorage.prefs(context).getString(AppStorage.DB_PATH, null)
+        if (!path.isNullOrEmpty() && File(path).exists()) return File(path)
+        return internalDb()
+    }
+
+    private fun internalDb(): File = context.getDatabasePath("presence.db")
+
+    private fun openDatabase(path: String) {
+        val next = Room.databaseBuilder(context.applicationContext, PresenceDb::class.java, path)
+            .allowMainThreadQueries()
+            .build()
+        db = next
+        dao = next.recs()
+    }
+
+    private fun closeLocked() {
+        try {
+            db?.close()
+        } catch (_: Exception) {
+        }
+        db = null
+        dao = null
+    }
+
+    private fun copyDb(source: File, dest: File): Boolean {
+        if (!source.exists()) return false
+        return try {
+            if (dest.exists()) dest.delete()
+            source.copyTo(dest, overwrite = true)
+            listOf("-wal", "-shm").forEach { suffix ->
+                val extra = File(source.absolutePath + suffix)
+                val target = File(dest.absolutePath + suffix)
+                if (target.exists()) target.delete()
+                if (extra.exists()) extra.copyTo(target, overwrite = true)
+            }
+            dest.exists() && dest.length() > 0L
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun deleteDb(file: File) {
+        file.delete()
+        File(file.absolutePath + "-wal").delete()
+        File(file.absolutePath + "-shm").delete()
+    }
+
+    private fun copyPrivateFiles(from: File, to: File) {
+        if (from.absolutePath == to.absolutePath || !from.exists()) return
+        to.mkdirs()
+        from.listFiles()?.forEach { file ->
+            if (!file.isFile) return@forEach
+            val target = File(to, file.name)
+            try {
+                file.copyTo(target, overwrite = true)
+                if (target.exists() && target.length() == file.length()) file.delete()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun readStatus(): StorageStatus {
+        val stored = AppStorage.prefs(context)
+        val location = stored.getString(AppStorage.LOCATION, "internal")
+        val path = stored.getString(AppStorage.DB_PATH, null)
+        val file = if (path.isNullOrEmpty()) null else File(path)
+        val missing = location == "sd" && (file == null || !file.exists())
+        return StorageStatus(
+            cardPresent = AppStorage.removableDir(context) != null,
+            onCard = location == "sd" && !missing,
+            cardMissing = missing,
+        )
+    }
+
+    private fun publishLocked() {
+        storageState.value = readStatus()
     }
 }

@@ -7,6 +7,7 @@ import app.presence.core.Snap
 import app.presence.core.StartHint
 import app.presence.core.Step
 import app.presence.core.arm
+import app.presence.core.beginRest as restNow
 import app.presence.core.due
 import app.presence.core.f
 import app.presence.core.finishSnap
@@ -68,6 +69,12 @@ class TimerCenter(
     fun stop() = end("stop")
 
     fun skip() = end("skip")
+
+    fun beginRest(kind: String) = synchronized(lock) {
+        val nowE = System.currentTimeMillis()
+        val nowL = android.os.SystemClock.elapsedRealtime()
+        apply(restNow(repo.currentSnap(), kind, nowE, nowL, UUID.randomUUID().toString(), UUID.randomUUID().toString()))
+    }
 
     fun due(token: String?): Boolean = synchronized(lock) {
         val current = repo.currentSnap()
