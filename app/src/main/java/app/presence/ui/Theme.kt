@@ -14,6 +14,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Typography
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -21,6 +23,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -68,8 +71,8 @@ private data class Palette(
 
 private fun scheme(dark: Boolean, palette: Palette) = if (dark) {
     darkColorScheme(
-        primary = ink(palette.primary),
-        onPrimary = ink(palette.onPrimary),
+        primary = ink(palette.primary).let { if (it.luminance() < 0.4f) lerp(it, Color.White, 0.5f) else it },
+        onPrimary = Color(0xFF111315),
         primaryContainer = ink(palette.primaryContainer),
         onPrimaryContainer = ink(palette.onPrimaryContainer),
         inversePrimary = ink(palette.inversePrimary),
@@ -95,7 +98,7 @@ private fun scheme(dark: Boolean, palette: Palette) = if (dark) {
         errorContainer = Color(0xFF93000A),
         onErrorContainer = Color(0xFFFFDAD6),
         outline = ink(palette.outline),
-        outlineVariant = ink(palette.outlineVariant),
+        outlineVariant = ink(palette.outlineVariant).let { if (it.luminance() > 0.2f) it.copy(alpha = 0.25f) else it },
         scrim = Color(0xFF000000),
         surfaceBright = ink(palette.surfaceBright),
         surfaceDim = ink(palette.surfaceDim),
@@ -134,7 +137,7 @@ private fun scheme(dark: Boolean, palette: Palette) = if (dark) {
         errorContainer = Color(0xFFF9DEDC),
         onErrorContainer = Color(0xFF410E0B),
         outline = ink(palette.outline),
-        outlineVariant = ink(palette.outlineVariant),
+        outlineVariant = ink(palette.outlineVariant).copy(alpha = 0.22f),
         scrim = Color(0xFF000000),
         surfaceBright = ink(palette.surfaceBright),
         surfaceDim = ink(palette.surfaceDim),
@@ -156,12 +159,12 @@ private val GroveLight = Palette(
 )
 
 private val GroveDark = Palette(
-    0x145C48, 0xF4FBF7, 0x1B5C46, 0xE9FFF6, 0x0E5C42,
-    0x1E4A3C, 0xE7F7F0, 0x1E4A3C, 0xE7F7F0,
-    0x1A4554, 0xE7F6FB, 0x1A4554, 0xE7F6FB,
-    0x101816, 0xF4F8F6, 0x172420, 0xF4F8F6, 0x24342E, 0xD5E6DE,
-    0xE7F2EC, 0x10241C, 0xC9E0D6, 0xA8C4B8,
-    0x2C4038, 0x0C1412, 0x1A2622, 0x20302A, 0x283C34, 0x141E1A, 0x0C1412,
+    0xA9C7B5, 0x15251B, 0x30453A, 0xD8E9DE, 0x38634C,
+    0xB6C5BC, 0x1B2B22, 0x2C3932, 0xDFE8E2,
+    0xBCC9BE, 0x233026, 0x344138, 0xE0EBE2,
+    0x111315, 0xF3F4F3, 0x1B1E21, 0xF3F4F3, 0x292D2F, 0xB0B7B3,
+    0xE3E7E4, 0x202622, 0x748079, 0x343A37,
+    0x333936, 0x111315, 0x1B1E21, 0x24292A, 0x2D3331, 0x16191B, 0x0E1011,
 )
 
 private val HarborLight = Palette(
@@ -390,7 +393,7 @@ private val Type = Typography(
 )
 
 @Composable
-fun PresenceTheme(dark: Boolean = isSystemInDarkTheme(), palette: String = "grove", content: @Composable () -> Unit) {
+fun PresenceTheme(dark: Boolean = isSystemInDarkTheme(), palette: String = "grove", textScale: Float = 1f, content: @Composable () -> Unit) {
     val scheme = scheme(dark, paletteOf(palette, dark))
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -401,7 +404,19 @@ fun PresenceTheme(dark: Boolean = isSystemInDarkTheme(), palette: String = "grov
             controller.isAppearanceLightNavigationBars = !dark
         }
     }
-    MaterialTheme(colorScheme = scheme, typography = Type) {
+    fun scaled(style: TextStyle) = style.copy(fontSize = style.fontSize * textScale, lineHeight = style.lineHeight * textScale)
+    val typography = Type.copy(
+        displayLarge = scaled(Type.displayLarge).copy(fontFeatureSettings = "tnum"),
+        displayMedium = scaled(Type.displayMedium).copy(fontFeatureSettings = "tnum"),
+        displaySmall = scaled(Type.displaySmall), headlineLarge = scaled(Type.headlineLarge),
+        headlineMedium = scaled(Type.headlineMedium), headlineSmall = scaled(Type.headlineSmall),
+        titleLarge = scaled(Type.titleLarge), titleMedium = scaled(Type.titleMedium), titleSmall = scaled(Type.titleSmall),
+        bodyLarge = scaled(Type.bodyLarge), bodyMedium = scaled(Type.bodyMedium), bodySmall = scaled(Type.bodySmall),
+        labelLarge = scaled(Type.labelLarge), labelMedium = scaled(Type.labelMedium), labelSmall = scaled(Type.labelSmall),
+    )
+    MaterialTheme(colorScheme = scheme, typography = typography, shapes = Shapes(
+        small = RoundedCornerShape(8.dp), medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp),
+    )) {
         CompositionLocalProvider(LocalContentColor provides scheme.onSurface, content = content)
     }
 }
@@ -411,7 +426,7 @@ fun presenceButtonColors() = ButtonDefaults.buttonColors(
     containerColor = MaterialTheme.colorScheme.primary,
     contentColor = MaterialTheme.colorScheme.onPrimary,
     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-    disabledContentColor = MaterialTheme.colorScheme.onSurface,
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
 )
 
 @Composable
@@ -419,7 +434,7 @@ fun presenceTonalColors() = ButtonDefaults.filledTonalButtonColors(
     containerColor = MaterialTheme.colorScheme.primaryContainer,
     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-    disabledContentColor = MaterialTheme.colorScheme.onSurface,
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
 )
 
 @Composable
@@ -477,8 +492,8 @@ fun presenceFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedTextColor = MaterialTheme.colorScheme.onSurface,
     unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
     disabledTextColor = MaterialTheme.colorScheme.onSurface,
-    focusedBorderColor = MaterialTheme.colorScheme.outline,
-    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.primary,
     disabledBorderColor = MaterialTheme.colorScheme.outline,
     focusedLabelColor = MaterialTheme.colorScheme.onSurface,
     unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,

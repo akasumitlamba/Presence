@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package app.presence.ui
 
@@ -21,6 +21,10 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +46,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Slider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -82,6 +94,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -110,6 +125,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import app.presence.MainActivity
 import app.presence.PresenceApp
@@ -134,13 +150,15 @@ import app.presence.core.dayKey
 import app.presence.core.dayTotals
 import app.presence.core.decodeBackup
 import app.presence.core.elapsedWork
-import app.presence.core.timeLeft
+import app.presence.core.displayMillis
 import app.presence.core.encodeBackup
 import app.presence.core.f
 import app.presence.core.freeProjectIds
 import app.presence.core.manualSession
 import app.presence.core.overlapsClosed
 import app.presence.core.overlapsOpen
+import app.presence.core.periodBounds
+import app.presence.core.shiftPeriod
 import app.presence.core.pauseNoteMillis
 import app.presence.core.sessionOpen
 import app.presence.core.stretchCount
@@ -168,49 +186,40 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun PresenceRoot() {
     val context = LocalContext.current
     val app = context.applicationContext as PresenceApp
     var ready by remember { mutableStateOf(app.ready.isCompleted) }
-    LaunchedEffect(Unit) {
-        app.ready.await()
-        ready = true
-    }
+    LaunchedEffect(Unit) { app.ready.await(); ready = true }
     if (!ready) {
-        PresenceTheme(androidx.compose.foundation.isSystemInDarkTheme()) {
+        PresenceTheme {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-                Text("Presence", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineMedium)
+                Text("Presence", style = MaterialTheme.typography.headlineMedium)
             }
         }
         return
     }
     val rows by app.repo.observe().collectAsState(initial = emptyList())
     val flags = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.body.orEmpty()
-    val t = remember(flags["language"]) { T(resolveLang(flags["language"] ?: "system")) }
-    val premium = true
+    val configuration = LocalConfiguration.current
+    val t = remember(flags["language"], configuration.locales.toLanguageTags()) { T(resolveLang(flags["language"] ?: "system")) }
     val dark = when (flags["theme"]) {
         "dark" -> true
         "light" -> false
         else -> androidx.compose.foundation.isSystemInDarkTheme()
     }
-    val palette = flags["palette"] ?: "grove"
-    val scale = when (flags["text"]) {
-        "compact" -> 0.9f
-        "large" -> 1.16f
-        else -> 1f
-    }
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val tall = configuration.orientation == Configuration.ORIENTATION_PORTRAIT ||
-        configuration.screenHeightDp > configuration.screenWidthDp
-    val wide = !tall && calculateWindowSizeClass(context as android.app.Activity).widthSizeClass != WindowWidthSizeClass.Compact
-    androidx.compose.runtime.CompositionLocalProvider(
-        LocalDensity provides Density(density.density * scale, density.fontScale * scale),
-    ) {
-        PresenceTheme(dark, palette) {
-            Shell(app, rows, t, premium, wide)
+    val scale = when (flags["text"]) { "compact" -> 0.9f; "large" -> 1.16f; else -> 1f }
+    PresenceTheme(dark, flags["palette"] ?: "grove", scale) {
+        // Background owns edge-to-edge drawing. Only this root owns system safe areas.
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            val systemInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+            BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(systemInsets).consumeWindowInsets(systemInsets)) {
+                val keyboard = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                CompositionLocalProvider(LocalUiLayout provides UiLayout(maxWidth, maxHeight, keyboard)) {
+                    Shell(app, rows, t, true, LocalUiLayout.current.twoPanes)
+                }
+            }
         }
     }
 }
@@ -218,116 +227,127 @@ fun PresenceRoot() {
 @Composable
 private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wide: Boolean) {
     val context = LocalContext.current
-    var tab by remember { mutableStateOf("timer") }
-    var projectId by remember { mutableStateOf<String?>(null) }
-    var pairing by remember { mutableStateOf(false) }
+    val layout = LocalUiLayout.current
+    var tab by rememberSaveable { mutableStateOf("timer") }
+    var projectId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pairing by rememberSaveable { mutableStateOf(false) }
+    val stateHolder = rememberSaveableStateHolder()
     val activity = context as? MainActivity
     val requested = activity?.requestedTab
     LaunchedEffect(requested) {
-        if (!requested.isNullOrEmpty()) {
-            tab = requested
-            pairing = false
-            activity?.requestedTab = null
-        }
+        if (!requested.isNullOrEmpty()) { tab = requested; pairing = false; activity?.requestedTab = null }
     }
-    var tick by remember { mutableIntStateOf(0) }
+    var tick by rememberSaveable { mutableIntStateOf(0) }
     val snap = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "snapshot" && !it.deleted }?.let { snapFrom(it.body) } ?: Snap()
     LaunchedEffect(snap.status, snap.completionToken) {
-        while (snap.status == "running" || snap.status == "paused") {
-            delay(200)
-            tick++
-        }
+        while (sessionOpen(snap)) { delay(200); tick++ }
     }
-    val nowE = System.currentTimeMillis()
-    val nowL = SystemClock.elapsedRealtime()
-    val shown = if (snap.kind == "track") elapsedWork(snap, nowE, nowL) else timeLeft(snap, nowE, nowL)
+    val shown = displayMillis(snap, System.currentTimeMillis(), SystemClock.elapsedRealtime())
     if (tick < 0) return
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
-    BackHandler(enabled = pairing || (!wide && projectId != null && tab == "projects")) {
-        if (pairing) pairing = false else projectId = null
+    val back: (() -> Unit)? = when {
+        pairing -> { { pairing = false } }
+        tab == "projects" && projectId != null && !wide -> { { projectId = null } }
+        else -> null
+    }
+    BackHandler(enabled = back != null) { back?.invoke() }
+    val title = when {
+        pairing -> t.pair
+        tab == "projects" && projectId != null && !wide -> rows.alive(KIND_PROJECT).find { it.id == projectId }?.f("name") ?: t.projects
+        tab == "projects" -> t.projects
+        tab == "todos" -> t.todos
+        tab == "stats" -> t.stats
+        tab == "settings" -> t.settings
+        else -> t.timer
     }
     val page: @Composable (Modifier) -> Unit = { modifier ->
-        Column(modifier) {
-            if ((snap.status == "running" || snap.status == "paused") && tab != "timer") {
-                Mini(t, snap, shown) { tab = "timer"; pairing = false }
+        Column(modifier.imePadding()) {
+            if (!(layout.short && layout.keyboard)) Box(Modifier.widthIn(max = 1200.dp).fillMaxWidth().align(Alignment.CenterHorizontally)) { PageHeader(title, t.back, back) }
+            if (sessionOpen(snap) && tab != "timer" && !(layout.short && layout.keyboard)) {
+                Box(Modifier.widthIn(max = 1200.dp).fillMaxWidth().padding(horizontal = layout.margin, vertical = 4.dp).align(Alignment.CenterHorizontally)) {
+                    Mini(t, snap, shown) { tab = "timer"; pairing = false }
+                }
             }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                when {
-                    pairing -> PairPage(app, t, rows)
-                    tab == "timer" -> TimerPage(app, t, rows, premium, wide, snap, shown) { }
-                    tab == "projects" -> ProjectsPage(app, t, rows, premium, wide, projectId, { projectId = it }) { }
-                    tab == "todos" -> TodosPage(app, t, rows, wide)
-                    tab == "stats" -> StatsPage(app, t, rows, premium, wide, snap) { }
-                    else -> SettingsPage(app, t, rows, premium, wide, { pairing = true }) { }
+            Box(Modifier.weight(1f).widthIn(max = 1200.dp).fillMaxWidth().align(Alignment.CenterHorizontally)) {
+                stateHolder.SaveableStateProvider(if (pairing) "pairing" else tab) {
+                    when {
+                        pairing -> PairPage(app, t, rows)
+                        tab == "timer" -> TimerPage(app, t, rows, premium, wide, snap, shown) { }
+                        tab == "projects" -> ProjectsPage(app, t, rows, premium, wide, projectId, { projectId = it }) { }
+                        tab == "todos" -> TodosPage(app, t, rows, wide)
+                        tab == "stats" -> StatsPage(app, t, rows, premium, wide, snap) { }
+                        else -> SettingsPage(app, t, rows, premium, wide, { pairing = true }) { }
+                    }
                 }
             }
         }
     }
-    if (wide) {
-        Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            Rail(t, tab) { tab = it; pairing = false }
-            page(Modifier.weight(1f).fillMaxSize())
-        }
-    } else {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            bottomBar = {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ) {
-                    NavigationBarItem(selected = tab == "timer", onClick = { tab = "timer"; pairing = false }, icon = { Icon(Icons.Filled.Timer, t.timer) }, label = { Text(t.timer) }, colors = presenceNavColors())
-                    NavigationBarItem(selected = tab == "projects", onClick = { tab = "projects"; pairing = false }, icon = { Icon(Icons.Filled.Folder, t.projects) }, label = { Text(t.projects) }, colors = presenceNavColors())
-                    NavigationBarItem(selected = tab == "todos", onClick = { tab = "todos"; pairing = false }, icon = { Icon(Icons.Filled.Check, t.todos) }, label = { Text(t.todos) }, colors = presenceNavColors())
-                    NavigationBarItem(selected = tab == "stats", onClick = { tab = "stats"; pairing = false }, icon = { Icon(Icons.Filled.BarChart, t.stats) }, label = { Text(t.stats) }, colors = presenceNavColors())
-                    NavigationBarItem(selected = tab == "settings", onClick = { tab = "settings"; pairing = false }, icon = { Icon(Icons.Filled.Settings, t.settings) }, label = { Text(t.settings) }, colors = presenceNavColors())
+    // Keep the content/provider at one composition position when navigation changes.
+    // Otherwise auto-generated saveable keys differ between the rail and bottom-bar branches.
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0),
+        bottomBar = {
+            if (!layout.rail) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, windowInsets = WindowInsets(0)) {
+                destinations(t).forEach { item ->
+                    NavigationBarItem(selected = tab == item.id, onClick = { tab = item.id; pairing = false }, icon = { Icon(item.icon, null) },
+                        label = { Text(item.title, maxLines = 2, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelSmall) }, colors = presenceNavColors())
                 }
-            },
-        ) { padding ->
-            page(Modifier.padding(padding).fillMaxSize())
+            }
+        },
+    ) { padding ->
+        Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+            if (layout.rail) Rail(t, tab) { tab = it; pairing = false }
+            page(Modifier.weight(1f).fillMaxHeight())
         }
     }
 }
 
+private data class Destination(val id: String, val title: String, val icon: ImageVector)
+private fun destinations(t: T) = listOf(
+    Destination("timer", t.timer, Icons.Outlined.Timer), Destination("projects", t.projects, Icons.Outlined.Folder),
+    Destination("todos", t.todos, Icons.Outlined.CheckBox), Destination("stats", t.stats, Icons.Outlined.BarChart),
+    Destination("settings", t.settings, Icons.Outlined.Settings),
+)
+
 @Composable
 private fun Rail(t: T, tab: String, onTab: (String) -> Unit) {
-    NavigationRail(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-    ) {
-        NavigationRailItem(selected = tab == "timer", onClick = { onTab("timer") }, icon = { Icon(Icons.Filled.Timer, t.timer) }, label = { Text(t.timer) }, colors = presenceRailColors())
-        NavigationRailItem(selected = tab == "projects", onClick = { onTab("projects") }, icon = { Icon(Icons.Filled.Folder, t.projects) }, label = { Text(t.projects) }, colors = presenceRailColors())
-        NavigationRailItem(selected = tab == "todos", onClick = { onTab("todos") }, icon = { Icon(Icons.Filled.Check, t.todos) }, label = { Text(t.todos) }, colors = presenceRailColors())
-        NavigationRailItem(selected = tab == "stats", onClick = { onTab("stats") }, icon = { Icon(Icons.Filled.BarChart, t.stats) }, label = { Text(t.stats) }, colors = presenceRailColors())
-        NavigationRailItem(selected = tab == "settings", onClick = { onTab("settings") }, icon = { Icon(Icons.Filled.Settings, t.settings) }, label = { Text(t.settings) }, colors = presenceRailColors())
+    val short = LocalUiLayout.current.short
+    Column(Modifier.width(if (short) 72.dp else 80.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow)
+        .presenceScroll(rememberScrollState()).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(if (short) 0.dp else 8.dp)) {
+        destinations(t).forEach { item ->
+            val selected = tab == item.id
+            Surface(onClick = { onTab(item.id) }, shape = RoundedCornerShape(12.dp),
+                color = if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp).fillMaxWidth().heightIn(min = 48.dp)) {
+                Column(Modifier.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(item.icon, null, Modifier.size(22.dp))
+                    Text(item.title, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center)
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun Mini(t: T, snap: Snap, shown: Long, onOpen: () -> Unit) {
     val app = LocalContext.current.applicationContext as PresenceApp
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-    ) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f).clickable(onClick = onOpen).heightIn(min = 48.dp), verticalArrangement = Arrangement.Center) {
                 Text(phase(t, snap.kind), style = MaterialTheme.typography.labelLarge)
-                Text(snap.projectName.ifBlank { t.unlabeled } + " · " + clockDigits(shown))
+                Text(snap.projectName.ifBlank { t.unlabeled }, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            TextButton(onClick = { if (snap.status == "paused") app.center.resume() else app.center.pause() }) {
-                Text(if (snap.status == "paused") t.play else t.pause)
+            Text(clockDigits(shown), style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"))
+            IconButton(onClick = { when(snap.status) { "running" -> app.center.pause(); "paused" -> app.center.resume(); else -> app.center.start("focus", null, null) } }) {
+                Icon(if (snap.status == "running") Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle, if (snap.status == "running") t.pause else t.play)
             }
+            IconButton(onClick = onOpen) { Icon(Icons.Outlined.OpenInFull, t.openTimer) }
         }
     }
 }
@@ -340,215 +360,125 @@ private fun phase(t: T, kind: String) = when (kind) {
 }
 
 @Composable
-private fun TimerPage(
-    app: PresenceApp,
-    t: T,
-    rows: List<Rec>,
-    premium: Boolean,
-    wide: Boolean,
-    snap: Snap,
-    shown: Long,
-    onGate: () -> Unit,
-) {
+private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, snap: Snap, shown: Long, onGate: () -> Unit) {
     val context = LocalContext.current
     val projects = rows.alive(KIND_PROJECT).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
-    val free = freeProjectIds(rows.alive(KIND_PROJECT))
-    var selected by remember { mutableStateOf(snap.projectId) }
-    var creating by remember { mutableStateOf(false) }
-    var projectMenu by remember { mutableStateOf(false) }
-    var taskId by remember { mutableStateOf(snap.taskId) }
-    var pending by remember { mutableStateOf<Rec?>(null) }
+    var selected by rememberSaveable { mutableStateOf(snap.projectId) }
+    var taskId by rememberSaveable { mutableStateOf(snap.taskId) }
+    var creating by rememberSaveable { mutableStateOf(false) }
+    var projectMenu by rememberSaveable { mutableStateOf(false) }
+    var pending by rememberRecordState()
+    val open = sessionOpen(snap)
+    LaunchedEffect(snap.projectId, snap.taskId, projects.map { it.id }) {
+        if (open) { selected = snap.projectId; taskId = snap.taskId }
+        else if (projects.none { it.id == selected }) { selected = projects.firstOrNull()?.id; taskId = null }
+    }
     val project = projects.find { it.id == selected }
     val tasks = rows.alive(KIND_TASK).filter { it.f("projectId") == project?.id && it.f("done") != "1" }
     val task = tasks.find { it.id == taskId }
-    LaunchedEffect(snap.projectId, snap.taskId) {
-        if (sessionOpen(snap)) { selected = snap.projectId; taskId = snap.taskId }
-    }
     val globals = app.repo.globals()
-    val open = sessionOpen(snap)
-    val planWork = if (open) snap.workMillis else project?.f("workSec")?.toLongOrNull()?.times(1_000L) ?: globals.workMillis
-    val planShorts = if (open) snap.shortCount else project?.f("shortCount")?.toIntOrNull() ?: globals.shortCount
-    val planLongs = if (open) snap.longCount else project?.f("longCount")?.toIntOrNull() ?: globals.longCount
-    val stretches = stretchCount(planShorts, planLongs)
-    val lengths = stretchLengths(planWork, stretches)
-    val label = when {
-        snap.status == "idle" || snap.status == "awaiting" -> t.focus
-        else -> phase(t, snap.kind)
-    }
-    val face = if (snap.status == "idle") lengths.first() else shown
-    val phaseWorked = elapsedWork(snap, System.currentTimeMillis(), SystemClock.elapsedRealtime())
-    val loggedId = if (open) snap.projectId else project?.id
-    val logged = if (loggedId == null) 0L else workedMillisFor(rows, loggedId)
-    val liveWork = if (open && snap.kind in setOf("focus", "track")) phaseWorked else 0L
-    val spent = logged + liveWork
-    val notificationsOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+    val planWork = if (open) snap.workMillis else project?.f("workSec")?.toLongOrNull()?.coerceIn(1, 356400)?.times(1000) ?: globals.workMillis
+    val shorts = if (open) snap.shortCount else project?.f("shortCount")?.toIntOrNull()?.coerceIn(0,24) ?: globals.shortCount
+    val longs = if (open) snap.longCount else project?.f("longCount")?.toIntOrNull()?.coerceIn(0,24) ?: globals.longCount
+    val stretches = stretchCount(shorts, longs)
+    val face = if (!open) { if (globals.countUp) 0L else stretchLengths(planWork, stretches).first() } else shown
+    val worked = elapsedWork(snap, System.currentTimeMillis(), SystemClock.elapsedRealtime())
+    val logged = (if (open) snap.projectId else project?.id)?.let { workedMillisFor(rows, it) } ?: 0L
+    val spent = logged + if (snap.status in setOf("running", "paused") && snap.kind in setOf("focus", "track")) worked else 0L
     val controls: @Composable () -> Unit = {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = project?.f("name").orEmpty().ifEmpty { t.chooseProject },
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text(t.projects) },
-                    trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = presenceFieldColors(),
-                )
-                Box(Modifier.matchParentSize().semantics { contentDescription = t.projects }.clickable { projectMenu = true })
+        SectionCard(spacing = 8.dp) {
+            Box {
+                OutlinedTextField(project?.f("name") ?: t.chooseProject, {}, readOnly = true, singleLine = true,
+                    label = { Text(t.projects) }, trailingIcon = { Icon(Icons.Outlined.ExpandMore, null) },
+                    colors = presenceFieldColors(), modifier = Modifier.fillMaxWidth())
+                Box(Modifier.matchParentSize().semantics { contentDescription = t.chooseProject }.clickable { projectMenu = true })
                 DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
-                    projects.forEach { item ->
-                        val locked = !premium && item.id !in free
-                        DropdownMenuItem(
-                            text = { Text(if (locked) item.f("name") + " · " + t.locked else item.f("name")) },
-                            onClick = {
-                                projectMenu = false
-                                if (locked) onGate() else {
-                                    if (open && item.id != snap.projectId) pending = item else {
-                                        selected = item.id
-                                        taskId = null
-                                    }
-                                }
-                            },
-                        )
-                    }
-                    DropdownMenuItem(
-                        text = { Text(t.newProject) },
-                        onClick = {
-                            projectMenu = false
-                            creating = true
-                        },
-                    )
+                    projects.forEach { item -> DropdownMenuItem(text = { Text(item.f("name")) }, onClick = {
+                        projectMenu = false
+                        if (open && item.id != snap.projectId) pending = item else { selected = item.id; taskId = null }
+                    }) }
+                    DropdownMenuItem(text = { Text(t.newProject) }, onClick = { projectMenu = false; creating = true })
                 }
             }
-            if (tasks.isNotEmpty()) {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    tasks.forEach { item ->
-                        PresenceChip(selected = item.id == taskId, onClick = { if (!open) taskId = if (taskId == item.id) null else item.id }, label = { Text(item.f("title")) })
-                    }
-                }
+            if (!open && tasks.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                tasks.forEach { item -> PresenceChip(item.id == taskId, { if (!open) taskId = if (taskId == item.id) null else item.id }, { Text(item.f("title")) }) }
             }
-            val canBegin = project != null
-            val playMod = if (wide) Modifier.heightIn(min = 56.dp) else Modifier.weight(1f).heightIn(min = 56.dp)
-            val stopMod = if (wide) Modifier.heightIn(min = 48.dp) else Modifier.weight(1f).heightIn(min = 48.dp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (open && snap.taskTitle.isNotBlank()) Text(snap.taskTitle, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PresenceButton(onClick = {
                     when (snap.status) {
                         "running" -> app.center.pause()
                         "paused" -> app.center.resume()
-                        "awaiting" -> app.center.start("focus", project, task)
-                        else -> {
-                            val chosen = project
-                            if (chosen != null) {
-                                if (!premium && chosen.id !in free) onGate()
-                                else app.center.start("focus", chosen, task)
-                            }
-                        }
+                        "awaiting" -> app.center.start(snap.awaitingKind.ifBlank { "focus" }, project, task)
+                        else -> project?.let { app.center.start("focus", it, task) }
                     }
-                }, enabled = open || canBegin, modifier = playMod) {
-                    Text(if (snap.status == "running") t.pause else t.play)
+                }, enabled = open || project != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Icon(if (snap.status == "running") Icons.Outlined.Pause else Icons.Outlined.PlayArrow, null, Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp)); Text(if (snap.status == "running") t.pause else t.play)
                 }
-                if (open) {
-                    TonalButton(onClick = { app.center.stop() }, modifier = stopMod) { Text(t.stop) }
+                if (!open && project != null) TonalButton({ app.center.start("track", project, task) }, Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
+                if (open) TonalButton({ app.center.stop() }, Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Icon(Icons.Outlined.Stop, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(t.stop)
                 }
             }
-            if (snap.status == "awaiting") Text(t.waiting)
-            if (!notificationsOn) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
+            if (snap.status in setOf("running", "paused") && snap.kind != "track") TextButton({ app.center.skip() }, modifier = Modifier.heightIn(min = 48.dp)) {
+                Icon(Icons.Outlined.SkipNext, null); Spacer(Modifier.width(8.dp)); Text(t.skip)
+            }
+            if (snap.status == "awaiting") Text(t.waiting, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!open && project == null) TonalButton({ creating = true }) { Text(t.newProject) }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Metric(t.loggedTime, if (spent < 60000) clockDigits(spent) else clockWords(spent))
+                Metric(t.pausesLabel, "${snap.pauseCount} · ${clockDigits(pauseNoteMillis(snap, System.currentTimeMillis()))}")
+            }
+            if (!androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
         }
     }
-    val ring = @Composable {
-        Box(Modifier.size(280.dp), contentAlignment = Alignment.Center) {
-            val color = MaterialTheme.colorScheme.primary
-            val track = MaterialTheme.colorScheme.outline
-            val dot = MaterialTheme.colorScheme.onSurface
-            Canvas(Modifier.fillMaxSize().padding(12.dp)) {
-                val gapDeg = 16f
-                val sweep = ((360f - gapDeg * stretches) / stretches).coerceAtLeast(8f)
-                val stroke = Stroke(22f, cap = StrokeCap.Round)
-                val onStretch = snap.kind == "focus" && (snap.status == "running" || snap.status == "paused")
-                val doneCount = when {
-                    snap.status == "idle" -> 0
-                    onStretch -> snap.stretchIndex.coerceIn(0, stretches)
-                    else -> snap.stretchIndex.coerceIn(0, stretches)
-                }
-                val partial = if (onStretch && snap.phaseMillis > 0L) {
-                    (1f - shown.toFloat() / snap.phaseMillis.toFloat()).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
-                for (index in 0 until stretches) {
-                    val start = -90f + index * (sweep + gapDeg)
-                    drawArc(track, start, sweep, false, style = stroke)
-                    val fill = when {
-                        index < doneCount -> sweep
-                        index == snap.stretchIndex && onStretch -> sweep * partial
-                        else -> 0f
+    BoxWithConstraints(Modifier.fillMaxSize().padding(LocalUiLayout.current.margin)) {
+        val columns = maxWidth >= 620.dp
+        val ringSize = if (columns) minOf(360.dp, maxHeight - 8.dp, maxWidth * 0.45f) else minOf(260.dp, maxWidth, maxHeight * 0.42f)
+        val ring: @Composable () -> Unit = {
+            Box(Modifier.size(ringSize), contentAlignment = Alignment.Center) {
+                val accent = MaterialTheme.colorScheme.primary
+                val track = MaterialTheme.colorScheme.outlineVariant
+                val progress = if (open && snap.kind != "track" && snap.phaseMillis > 0 && snap.status != "awaiting") (worked.toFloat() / snap.phaseMillis).coerceIn(0f,1f) else 0f
+                Canvas(Modifier.fillMaxSize().padding(8.dp).semantics { contentDescription = "${phase(t, snap.kind)} ${clockDigits(face)}" }) {
+                    val stroke = Stroke(6.dp.toPx(), cap = StrokeCap.Round)
+                    drawArc(track, -90f, 360f, false, style = stroke)
+                    if (progress > 0) drawArc(accent, -90f, progress * 360f, false, style = stroke)
+                    val markerSpace = (size.width * 0.4f) / stretches
+                    val radius = minOf(3.dp.toPx(), markerSpace * 0.3f)
+                    repeat(stretches) { index ->
+                        val done = open && index < snap.stretchIndex
+                        val current = open && index == snap.stretchIndex && snap.kind == "focus"
+                        drawCircle(if (done || current) accent else track, radius,
+                            Offset(size.width * 0.3f + markerSpace * (index + 0.5f), size.height * 0.88f))
                     }
-                    if (fill > 0.5f) drawArc(color, start, fill, false, style = stroke)
                 }
-                val dotAngle = when {
-                    snap.status == "idle" -> -90f
-                    onStretch -> -90f + snap.stretchIndex.coerceIn(0, stretches - 1) * (sweep + gapDeg) + sweep * partial
-                    doneCount <= 0 -> -90f
-                    else -> -90f + (doneCount - 1) * (sweep + gapDeg) + sweep + gapDeg / 2f
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                    Text(if (snap.status == "idle") t.focus else phase(t, snap.kind), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(clockDigits(face), style = if (face >= 3_600_000L) MaterialTheme.typography.displaySmall else if (ringSize < 240.dp) MaterialTheme.typography.displayMedium else MaterialTheme.typography.displayLarge,
+                        maxLines = 1, softWrap = false)
+                    if (snap.kind != "track") Text(t.cycleLine(if (open) (snap.stretchIndex + 1).coerceAtMost(stretches) else 1, stretches),
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (snap.status == "paused") Text(t.paused, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
-                val radius = size.minDimension / 2f - 11f
-                val rad = Math.toRadians(dotAngle.toDouble())
-                drawCircle(
-                    color = dot,
-                    radius = 7f,
-                    center = Offset(center.x + cos(rad).toFloat() * radius, center.y + sin(rad).toFloat() * radius),
-                )
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(label, style = MaterialTheme.typography.titleMedium)
-                Text(clockDigits(face), style = MaterialTheme.typography.displayLarge)
-                Text(clockDigits(spent), style = MaterialTheme.typography.titleMedium)
             }
         }
-    }
-    Box(Modifier.fillMaxSize()) {
-        if (wide) {
-            Row(Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { ring() }
-                Column(Modifier.weight(1f)) { controls() }
-            }
-        } else {
-            Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = if (open) 40.dp else 0.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Spacer(Modifier.height(12.dp))
-                ring()
-                controls()
-            }
-        }
-        if (open) {
-            Text(
-                t.pauses(snap.pauseCount, clockDigits(pauseNoteMillis(snap, System.currentTimeMillis()))),
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.End,
-            )
+        if (maxHeight < 180.dp) Column(Modifier.fillMaxSize().presenceScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("${phase(t, snap.kind)} · ${clockDigits(face)}", style = MaterialTheme.typography.titleLarge)
+            controls()
+        } else if (columns) Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { ring() }
+            Column(Modifier.weight(1f).widthIn(max = 440.dp).presenceScroll(rememberScrollState())) { controls() }
+        } else Column(Modifier.fillMaxSize().presenceScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            ring(); controls(); Spacer(Modifier.height(8.dp))
         }
     }
-    if (pending != null) {
-        Confirm(t.switchTitle, t.switchBody, t.save, t.cancel, {
-            val next = pending
-            selected = next?.id
-            taskId = null
-            pending = null
-            app.center.stop()
-            if (next != null) app.center.start("focus", next, null)
-        }, { pending = null })
-    }
-    if (creating) {
-        NameDialog(t.newProject, "", t, { creating = false }) { name ->
-            creating = false
-            selected = addProject(app, projects, name)
-            taskId = null
-        }
-    }
+    pending?.let { item -> Confirm(t.switchTitle, t.switchBody, t.save, t.cancel, {
+        selected = item.id; taskId = null; pending = null; app.center.stop(); app.center.start("focus", item, null)
+    }, { pending = null }) }
+    if (creating) NameDialog(t.newProject, "", t, { creating = false }) { name -> selected = addProject(app, projects, name); taskId = null; creating = false }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -569,72 +499,55 @@ private fun ProjectsPage(
     val projects = rows.alive(KIND_PROJECT).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
     val tags = rows.alive(KIND_TAG)
     val free = freeProjectIds(projects)
-    var filter by remember { mutableStateOf<String?>(null) }
-    var menuFor by remember { mutableStateOf<String?>(null) }
-    var creating by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf<Rec?>(null) }
-    var pendingPlay by remember { mutableStateOf<Rec?>(null) }
+    var filter by rememberSaveable { mutableStateOf<String?>(null) }
+    var menuFor by rememberSaveable { mutableStateOf<String?>(null) }
+    var creating by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberRecordState()
+    var pendingPlay by rememberRecordState()
     val visible = projects.filter { filter == null || it.f("tags").split(",").contains(filter) }
     val list: @Composable (Modifier) -> Unit = { modifier ->
-        Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (tags.isNotEmpty()) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PresenceChip(selected = filter == null, onClick = { filter = null }, label = { Text(t.all) })
-                    tags.forEach { tag ->
-                        PresenceChip(selected = filter == tag.id, onClick = { filter = if (filter == tag.id) null else tag.id }, label = { Text(tag.f("name")) })
+        Column(modifier.padding(LocalUiLayout.current.margin), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            PresenceButton(onClick = { creating = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+                Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.newProject)
+            }
+            if (tags.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PresenceChip(filter == null, { filter = null }, { Text(t.all) })
+                tags.forEach { tag -> PresenceChip(filter == tag.id, { filter = if (filter == tag.id) null else tag.id }, { Text(tag.f("name")) }) }
+            }
+            if (visible.isEmpty()) Text(t.emptyProjects, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PresenceList(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
+                items(visible, key = { it.id }) { project ->
+                    val selected = project.id == selectedId
+                    val todayMs = rows.filter { it.kind == KIND_SESSION && it.f("projectId") == project.id }.sumOf { rec ->
+                        val start = rec.f("startedAt").toLongOrNull() ?: return@sumOf 0L
+                        if (dayKey(start, zone, dayStart) != today) 0L else sessionCountedMillis(rec)
                     }
-                }
-            }
-            if (visible.isEmpty()) {
-                Text(t.emptyProjects, style = MaterialTheme.typography.titleLarge)
-            }
-            visible.forEach { project ->
-                val locked = !premium && project.id !in free
-                val todayMs = rows.filter { it.kind == KIND_SESSION && it.f("projectId") == project.id }.sumOf { rec ->
-                    val start = rec.f("startedAt").toLongOrNull() ?: return@sumOf 0L
-                    if (dayKey(start, zone, dayStart) != today) 0L else sessionCountedMillis(rec)
-                }
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.fillMaxWidth().combinedClickable(
-                        onClick = { onSelect(project.id) },
-                        onLongClick = { menuFor = project.id },
-                    ),
-                ) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(18.dp).clip(CircleShape).background(colorOf(project.f("color"))))
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(project.f("name"), style = MaterialTheme.typography.titleMedium)
-                            Text(if (locked) t.locked else clockWords(todayMs), style = MaterialTheme.typography.bodyMedium)
-                        }
-                        TextButton(onClick = {
-                            if (locked) onGate() else {
-                                val snap = app.center.snap()
-                                val mine = sessionOpen(snap) && snap.projectId == project.id
-                                if (mine) app.center.stop()
-                                else if (sessionOpen(snap)) pendingPlay = project
-                                else app.center.start("focus", project, null)
+                    Surface(color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                        shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onSelect(project.id) }, onLongClick = { menuFor = project.id })) {
+                        Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).clip(CircleShape).background(chartColor(project.f("color"), MaterialTheme.colorScheme.background.isDark())))
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(project.f("name"), style = MaterialTheme.typography.titleMedium)
+                                Text(clockWords(todayMs), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                        }) {
-                            val snap = app.center.snap()
-                            Text(if (sessionOpen(snap) && snap.projectId == project.id) t.stop else t.play)
-                        }
-                        TextButton(onClick = { confirmDelete = project }) { Text(t.delete) }
-                        DropdownMenu(expanded = menuFor == project.id, onDismissRequest = { menuFor = null }) {
-                            DropdownMenuItem(text = { Text(t.moveUp) }, onClick = { menuFor = null; move(app, projects, project, -1) })
-                            DropdownMenuItem(text = { Text(t.moveDown) }, onClick = { menuFor = null; move(app, projects, project, 1) })
-                            DropdownMenuItem(text = { Text(t.delete) }, onClick = { menuFor = null; confirmDelete = project })
+                            val current = app.center.snap()
+                            val active = sessionOpen(current) && current.projectId == project.id
+                            IconButton(onClick = {
+                                if (active) app.center.stop() else if (sessionOpen(current)) pendingPlay = project else app.center.start("focus", project, null)
+                            }) { Icon(if (active) Icons.Outlined.Stop else Icons.Outlined.PlayArrow, if (active) t.stop else t.play) }
+                            Box {
+                                IconButton({ menuFor = project.id }) { Icon(Icons.Outlined.MoreVert, t.actions) }
+                                DropdownMenu(menuFor == project.id, { menuFor = null }) {
+                                    DropdownMenuItem(text = { Text(t.moveUp) }, onClick = { menuFor = null; move(app, projects, project, -1) })
+                                    DropdownMenuItem(text = { Text(t.moveDown) }, onClick = { menuFor = null; move(app, projects, project, 1) })
+                                    DropdownMenuItem(text = { Text(t.delete) }, onClick = { menuFor = null; confirmDelete = project })
+                                }
+                            }
                         }
                     }
                 }
             }
-            PresenceButton(onClick = {
-                if (!premium && projects.size >= FREE_PROJECTS) onGate() else creating = true
-            }, modifier = Modifier.heightIn(min = 52.dp)) { Text(t.newProject) }
         }
     }
     val detail: @Composable (Modifier) -> Unit = { modifier ->
@@ -642,21 +555,12 @@ private fun ProjectsPage(
         if (project == null) {
             Box(modifier.padding(16.dp), contentAlignment = Alignment.Center) { Text(t.chooseProject, style = MaterialTheme.typography.titleLarge) }
         } else {
-            ProjectDetail(app, t, rows, project, premium, modifier, onGate)
+            key(project.id) { ProjectDetail(app, t, rows, project, premium, modifier, onGate) }
         }
     }
-    if (wide) {
-        Row(Modifier.fillMaxSize()) {
-            list(Modifier.weight(0.42f).fillMaxSize())
-            detail(Modifier.weight(0.58f).fillMaxSize())
-        }
-    } else if (selectedId == null) {
-        list(Modifier.fillMaxSize())
-    } else {
-        Column(Modifier.fillMaxSize()) {
-            TextButton(onClick = { onSelect(null) }) { Text(t.back) }
-            detail(Modifier.weight(1f))
-        }
+    Row(Modifier.fillMaxSize()) {
+        if (wide || selectedId == null) list(if (wide) Modifier.width(320.dp).fillMaxHeight() else Modifier.weight(1f).fillMaxHeight())
+        if (wide || selectedId != null) detail(Modifier.weight(1f).fillMaxHeight())
     }
     if (creating) {
         NameDialog(t.newProject, "", t, { creating = false }) { name ->
@@ -744,121 +648,111 @@ private fun ProjectDetail(
 ) {
     val tasks = rows.alive(KIND_TASK).filter { it.f("projectId") == project.id }.sortedBy { it.f("sort").toIntOrNull() ?: 0 }
     val tags = rows.alive(KIND_TAG)
-    var taskFilter by remember { mutableStateOf<String?>(null) }
-    var newTask by remember { mutableStateOf(false) }
-    var goalOpen by remember { mutableStateOf(false) }
-    var deleteTask by remember { mutableStateOf<Rec?>(null) }
-    var newTag by remember { mutableStateOf(false) }
-    var editTag by remember { mutableStateOf<Rec?>(null) }
-    var name by remember(project.id) { mutableStateOf(project.f("name")) }
+    var taskFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    var newTask by rememberSaveable { mutableStateOf(false) }
+    var goalOpen by rememberSaveable { mutableStateOf(false) }
+    var deleteTask by rememberRecordState()
+    var editTask by rememberRecordState()
+    var newTag by rememberSaveable { mutableStateOf(false) }
+    var editTag by rememberRecordState()
+    var name by rememberSaveable(project.id) { mutableStateOf(project.f("name")) }
     val zone = ZoneId.systemDefault()
     val globals = app.repo.globals()
     val worked = workedMillisFor(rows, project.id)
     val shownTasks = tasks.filter { taskFilter == null || it.f("tags").split(",").contains(taskFilter) }
-    Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            name,
-            { value ->
-                name = value
-                val trimmed = value.trim()
-                if (trimmed.isNotEmpty() && trimmed != project.f("name")) {
-                    val body = project.body.toMutableMap()
-                    body["name"] = trimmed
-                    app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
-                }
-            },
-            label = { Text(t.name) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = presenceFieldColors(),
-        )
-        Text(t.goal, style = MaterialTheme.typography.titleLarge)
-        val goalMinutes = project.f("goalMinutes").toIntOrNull()
-        val deadline = project.f("goalDeadline").toLongOrNull()
-        if (goalMinutes != null && deadline != null) {
-            val daily = dailyTargetMinutes(goalMinutes, worked, deadline, System.currentTimeMillis(), zone, globals.dayStart)
-            val today = dayKey(System.currentTimeMillis(), zone, globals.dayStart)
-            val todayMs = rows.filter { it.kind == KIND_SESSION && it.f("projectId") == project.id }.sumOf { rec ->
-                val start = rec.f("startedAt").toLongOrNull() ?: return@sumOf 0L
-                if (dayKey(start, zone, globals.dayStart) != today) 0L else sessionCountedMillis(rec)
-            }
-            Text(t.daily + " · " + clockWords(daily * 60_000L))
-            Text(t.today + " · " + clockWords(todayMs))
-            Text(t.remainder + " · " + clockWords(((goalMinutes * 60_000L) - worked).coerceAtLeast(0)))
-            Text(t.deadline + " · " + dayKey(deadline, zone, globals.dayStart))
-            TextButton(onClick = {
-                if (!premium) onGate() else {
-                    val body = project.body.toMutableMap()
-                    body["goalMinutes"] = ""
-                    body["goalDeadline"] = ""
-                    app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
-                }
-            }) { Text(t.clearGoal) }
-        } else {
-            Text(t.noGoal)
-            PresenceButton(onClick = { if (premium) goalOpen = true else onGate() }) { Text(t.setGoal) }
-        }
-        Text(t.ownTimer, style = MaterialTheme.typography.titleLarge)
-        if (!premium) {
-            TextButton(onClick = onGate) { Text(t.locked) }
-        } else {
-            ProjectPlanFields(t, project, globals) { key, value ->
-                val latest = app.repo.snapshot().find { it.kind == KIND_PROJECT && it.id == project.id } ?: project
-                val body = latest.body.toMutableMap()
-                body[key] = value
-                app.repo.put(latest.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
-                app.center.refreshSettings()
+    fun saveProject(changes: Map<String, String>) {
+        val current = app.repo.snapshot().find { it.kind == KIND_PROJECT && it.id == project.id && !it.deleted } ?: return
+        app.repo.put(current.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = current.body + changes))
+    }
+    var tagMenu by rememberSaveable(project.id) { mutableStateOf<String?>(null) }
+    PresenceList(modifier.padding(horizontal = LocalUiLayout.current.margin), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
+        item(key = "name") {
+            SectionCard {
+                OutlinedTextField(name, { value -> name = value; if (value.isNotBlank()) saveProject(mapOf("name" to value.trim())) },
+                    label = { Text(t.name) }, colors = presenceFieldColors(), modifier = Modifier.fillMaxWidth(), singleLine = true)
+
             }
         }
-        Text(t.tags, style = MaterialTheme.typography.titleLarge)
-        tags.forEach { tag ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(tag.f("name"), modifier = Modifier.weight(1f))
-                TextButton(onClick = { if (premium) editTag = tag else onGate() }) { Text(t.rename) }
-                TextButton(onClick = {
-                    if (!premium) onGate() else app.repo.put(tag.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId()))
-                }) { Text(t.delete) }
-            }
-        }
-        PresenceButton(onClick = { if (premium) newTag = true else onGate() }) { Text(t.newTag) }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            tags.forEach { tag ->
-                val on = project.f("tags").split(",").contains(tag.id)
-                PresenceChip(selected = on, onClick = {
-                    if (!premium) onGate() else {
-                        val set = project.f("tags").split(",").filter { it.isNotBlank() }.toMutableSet()
-                        if (on) set.remove(tag.id) else set.add(tag.id)
-                        val body = project.body.toMutableMap()
-                        body["tags"] = set.joinToString(",")
-                        app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
+        item(key = "goal") {
+            SectionCard(t.goal) {
+                val goalMinutes = project.f("goalMinutes").toIntOrNull()
+                val deadline = project.f("goalDeadline").toLongOrNull()
+                if (goalMinutes != null && deadline != null) {
+                    val daily = dailyTargetMinutes(goalMinutes, worked, deadline, System.currentTimeMillis(), zone, globals.dayStart)
+                    val today = dayKey(System.currentTimeMillis(), zone, globals.dayStart)
+                    val todayMs = dayTotals(rows.filter { it.f("projectId") == project.id }, listOf(today), zone, globals.dayStart).single()
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Metric(t.daily, clockWords(daily * 60_000L)); Metric(t.today, clockWords(todayMs))
+                        Metric(t.remainder, clockWords((goalMinutes * 60_000L - worked).coerceAtLeast(0)))
                     }
-                }, label = { Text(tag.f("name")) })
+                    Text("${t.deadline}: ${dayKey(deadline, zone, globals.dayStart)}", style = MaterialTheme.typography.bodyMedium)
+                    TextButton({ saveProject(mapOf("goalMinutes" to "", "goalDeadline" to "")) }) { Text(t.clearGoal) }
+                } else {
+                    Text(t.noGoal, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TonalButton({ goalOpen = true }) { Text(t.setGoal) }
+                }
             }
         }
-        Text(t.tasks, style = MaterialTheme.typography.titleLarge)
-        if (tags.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PresenceChip(selected = taskFilter == null, onClick = { taskFilter = null }, label = { Text(t.all) })
+        item(key = "plan") {
+            SectionCard(t.focusPlan) {
+                ProjectPlanFields(t, project, globals) { key, value -> saveProject(mapOf(key to value)); app.center.refreshSettings() }
+                Text(t.nextSitting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        item(key = "tags") {
+            SectionCard(t.tags) {
+                TonalButton({ newTag = true }) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.newTag) }
                 tags.forEach { tag ->
-                    PresenceChip(selected = taskFilter == tag.id, onClick = { taskFilter = if (taskFilter == tag.id) null else tag.id }, label = { Text(tag.f("name")) })
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(tag.f("name"), Modifier.weight(1f))
+                        Box {
+                            IconButton({ tagMenu = tag.id }) { Icon(Icons.Outlined.MoreVert, t.actions) }
+                            DropdownMenu(tagMenu == tag.id, { tagMenu = null }) {
+                                DropdownMenuItem(text = { Text(t.rename) }, onClick = { tagMenu = null; editTag = tag })
+                                DropdownMenuItem(text = { Text(t.delete) }, onClick = {
+                                    tagMenu = null; app.repo.put(tag.copy(deleted = true, updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId()))
+                                })
+                            }
+                        }
+                    }
+                }
+                if (tags.isNotEmpty()) {
+                    Text(t.assignedTags, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        tags.forEach { tag ->
+                            val picked = project.f("tags").split(",").filter { it.isNotBlank() }.toSet()
+                            PresenceChip(tag.id in picked, { saveProject(mapOf("tags" to (if (tag.id in picked) picked - tag.id else picked + tag.id).joinToString(","))) }, { Text(tag.f("name")) })
+                        }
+                    }
                 }
             }
         }
-        if (shownTasks.isEmpty()) Text(t.emptyTasks)
-        shownTasks.forEachIndexed { index, task ->
-            val locked = !premium && index >= FREE_TASKS
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = task.f("done") == "1", onCheckedChange = {
-                    if (locked) onGate() else {
-                        val body = task.body.toMutableMap()
-                        body["done"] = if (it) "1" else "0"
-                        app.repo.put(task.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
-                    }
-                })
-                Text(task.f("title") + if (locked) " · " + t.locked else "", modifier = Modifier.weight(1f))
-                TextButton(onClick = { deleteTask = task }) { Text(t.delete) }
+        item(key = "task-header") {
+            SectionCard(t.tasks) {
+                TonalButton({ newTask = true }) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.newTask) }
+                if (tags.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PresenceChip(taskFilter == null, { taskFilter = null }, { Text(t.all) })
+                    tags.forEach { tag -> PresenceChip(taskFilter == tag.id, { taskFilter = if (taskFilter == tag.id) null else tag.id }, { Text(tag.f("name")) }) }
+                }
+                if (shownTasks.isEmpty()) Text(t.emptyTasks, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        PresenceButton(onClick = { if (!premium && tasks.size >= FREE_TASKS) onGate() else newTask = true }) { Text(t.newTask) }
+        items(shownTasks, key = { "task-${it.id}" }) { task ->
+            Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp)) {
+                Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(task.f("done") == "1", {
+                        val latest = app.repo.snapshot().find { row -> row.kind == KIND_TASK && row.id == task.id } ?: task
+                        app.repo.put(latest.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = latest.body + ("done" to if (it) "1" else "0")))
+                    })
+                    Column(Modifier.weight(1f).heightIn(min = 48.dp).clickable { editTask = task }, verticalArrangement = Arrangement.Center) {
+                        Text(task.f("title"), style = MaterialTheme.typography.bodyLarge.copy(textDecoration = if (task.f("done") == "1") TextDecoration.LineThrough else null))
+                        val tagNames = tags.filter { it.id in task.f("tags").split(",") }.joinToString(", ") { it.f("name") }
+                        if (tagNames.isNotEmpty()) Text(tagNames, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton({ deleteTask = task }) { Icon(Icons.Outlined.DeleteOutline, t.deleteTask) }
+                }
+            }
+        }
     }
     if (newTag) {
         NameDialog(t.newTag, "", t, { newTag = false }) { title ->
@@ -874,6 +768,32 @@ private fun ProjectDetail(
             editTag = null
         }
     }
+    editTask?.let { item ->
+        var title by rememberSaveable(item.id) { mutableStateOf(item.f("title")) }
+        var picked by rememberSaveable(item.id) { mutableStateOf(item.f("tags").split(",").filter { it.isNotBlank() }.toSet()) }
+        PresenceDialog(
+            onDismissRequest = { editTask = null },
+            title = { Text(t.tasks) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(title, { title = it }, label = { Text(t.name) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        tags.forEach { tag ->
+                            PresenceChip(selected = tag.id in picked, onClick = {
+                                picked = if (tag.id in picked) picked - tag.id else picked + tag.id
+                            }, label = { Text(tag.f("name")) })
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
+                val latest = app.repo.snapshot().find { it.kind == KIND_TASK && it.id == item.id } ?: item
+                app.repo.put(latest.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = latest.body + mapOf("title" to title.trim(), "tags" to picked.joinToString(","))))
+                editTask = null
+            }) { Text(t.save) } },
+            dismissButton = { TextButton(onClick = { editTask = null }) { Text(t.cancel) } },
+        )
+    }
     if (newTask) {
         NameDialog(t.newTask, "", t, { newTask = false }) { title ->
             newTask = false
@@ -885,7 +805,7 @@ private fun ProjectDetail(
                         "projectId" to project.id,
                         "title" to title,
                         "done" to "0",
-                        "tags" to "",
+                        "tags" to taskFilter.orEmpty(),
                         "sort" to tasks.size.toString(),
                     ),
                 ),
@@ -921,58 +841,40 @@ private fun PlanSections(
     onShort: (Long) -> Unit,
     onLong: (Long) -> Unit,
 ) {
-    val lengths = stretchLengths(workSec.coerceAtLeast(1L) * 1_000L, stretchCount(shortCount, longCount))
+    val count = stretchCount(shortCount, longCount)
+    val lengths = stretchLengths(workSec.coerceAtLeast(1L) * 1000L, count)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        FieldSection(t.workTime, t.workHelp) {
-            HmsFields(t, workSec, onWork)
-            Text(t.stretchSummary(stretchCount(shortCount, longCount), clockDigits(lengths.first())), color = MaterialTheme.colorScheme.onSurface)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(t.workTime, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            Explain(t.workHelp)
         }
-        FieldSection(t.shortBreaks, t.shortCountHelp) {
-            CountStepper(t, t.shortBreaks, shortCount, 0, 12, onShortCount)
-            HmsFields(t, shortSec, onShort)
-        }
-        FieldSection(t.longBreaks, t.longCountHelp) {
-            CountStepper(t, t.longBreaks, longCount, 0, 12, onLongCount)
-            HmsFields(t, longSec, onLong)
-        }
-    }
-}
-
-@Composable
-private fun FieldSection(title: String, help: String, content: @Composable () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                Explain(help)
-            }
-            content()
-        }
+        HmsFields(t, workSec, onWork)
+        Text(t.stretchSummary(count, clockDigits(lengths.first())), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        CountStepper(t, t.shortBreaks, shortCount, 0, 12, onShortCount)
+        HmsFields(t, shortSec, onShort)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        CountStepper(t, t.longBreaks, longCount, 0, 12, onLongCount)
+        HmsFields(t, longSec, onLong)
     }
 }
 
 @Composable
 private fun HmsFields(t: T, totalSec: Long, onSec: (Long) -> Unit) {
     val parts = splitSeconds(totalSec)
-    var hours by remember(totalSec) { mutableStateOf(parts.first.toString()) }
-    var minutes by remember(totalSec) { mutableStateOf(parts.second.toString()) }
-    var seconds by remember(totalSec) { mutableStateOf(parts.third.toString()) }
+    var hours by rememberSaveable(totalSec) { mutableStateOf(parts.first.toString()) }
+    var minutes by rememberSaveable(totalSec) { mutableStateOf(parts.second.toString()) }
+    var seconds by rememberSaveable(totalSec) { mutableStateOf(parts.third.toString()) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        UnitBox(t.hours, hours) {
+        UnitBox(t.hours, hours, Modifier.weight(1f)) {
             hours = it
             onSec(joinSeconds(it, minutes, seconds))
         }
-        UnitBox(t.minutes, minutes) {
+        UnitBox(t.minutes, minutes, Modifier.weight(1f)) {
             minutes = it
             onSec(joinSeconds(hours, it, seconds))
         }
-        UnitBox(t.seconds, seconds) {
+        UnitBox(t.seconds, seconds, Modifier.weight(1f)) {
             seconds = it
             onSec(joinSeconds(hours, minutes, it))
         }
@@ -980,16 +882,13 @@ private fun HmsFields(t: T, totalSec: Long, onSec: (Long) -> Unit) {
 }
 
 @Composable
-private fun UnitBox(label: String, value: String, onValue: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = { raw -> onValue(raw.filter { it.isDigit() }.take(2)) },
-        label = { Text(label) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.width(104.dp),
-        colors = presenceFieldColors(),
-    )
+private fun UnitBox(label: String, value: String, modifier: Modifier, onValue: (String) -> Unit) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedTextField(value, { raw -> onValue(raw.filter { it in '0'..'9' }.take(2)) }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = label }, colors = presenceFieldColors())
+    }
 }
 
 private fun splitSeconds(total: Long): Triple<Int, Int, Int> {
@@ -1037,247 +936,180 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
     val zone = ZoneId.systemDefault()
     val dayStart = app.repo.globals().dayStart
     val today = dayKey(System.currentTimeMillis(), zone, dayStart)
-    var range by remember { mutableIntStateOf(0) }
-    var weekShift by remember { mutableIntStateOf(0) }
-    var month by remember { mutableStateOf(YearMonth.from(today)) }
-    var selectedDay by remember { mutableStateOf(today) }
-    var pickedBar by remember { mutableIntStateOf(-1) }
-    var pickedSlice by remember { mutableIntStateOf(-1) }
-    var manual by remember { mutableStateOf(false) }
-    var note by remember { mutableStateOf("") }
-    val drag = remember { mutableFloatStateOf(0f) }
-    val fromTo = when (range) {
-        1 -> today.minusDays((6 + weekShift * 7).toLong()) to today.minusDays((weekShift * 7).toLong())
-        2 -> month.atDay(1) to month.atEndOfMonth()
-        3 -> LocalDate.of(today.year, 1, 1) to LocalDate.of(today.year, 12, 31)
-        else -> today to today
-    }
-    val slices = slicesFor(rows, fromTo.first, fromTo.second, zone, dayStart)
+    var range by rememberSaveable { mutableIntStateOf(0) }
+    var anchor by rememberSaveable(stateSaver = DateSaver) { mutableStateOf(today) }
+    var month by rememberSaveable(stateSaver = MonthSaver) { mutableStateOf(YearMonth.from(today)) }
+    var selectedDay by rememberSaveable(stateSaver = DateSaver) { mutableStateOf(today) }
+    var pickedBar by rememberSaveable { mutableIntStateOf(-1) }
+    var pickedSlice by rememberSaveable { mutableIntStateOf(-1) }
+    var manual by rememberSaveable { mutableStateOf(false) }
+    var note by rememberSaveable { mutableStateOf("") }
+    val bounds = periodBounds(range, anchor)
+    val slices = slicesFor(rows, bounds.first, bounds.second, zone, dayStart)
     val total = slices.sumOf { it.millis }
-    val weekStart = today.minusDays((6 + weekShift * 7).toLong())
-    val weekDays = (0..6).map { weekStart.plusDays(it.toLong()) }
-    val bars = dayTotals(rows, weekDays, zone, dayStart)
+    val closed = rows.filter { sessionCountedMillis(it) > 0 }
+    val count = closed.count { rec -> rec.f("startedAt").toLongOrNull()?.let { dayKey(it, zone, dayStart) in bounds.first..bounds.second } == true }
+    val week = periodBounds(1, anchor)
+    val days = (0..6).map { week.first.plusDays(it.toLong()) }
+    val bars = dayTotals(rows, days, zone, dayStart)
     val percents = wholePercents(slices.map { it.millis })
+    val dateFormat = java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+    fun label(first: LocalDate, last: LocalDate) = if (first == last) first.format(dateFormat) else "${first.format(dateFormat)} – ${last.format(dateFormat)}"
+    fun navigate(amount: Long) {
+        anchor = shiftPeriod(range, anchor, amount).coerceAtMost(today)
+        selectedDay = anchor; month = YearMonth.from(anchor); pickedBar = -1; pickedSlice = -1
+    }
     fun share() {
-        val text = shareSummary(t.stats, listOf(t.today, t.week, t.month, t.year)[range], slices.map { it.name.ifBlank { t.unlabeled } to it.millis }) { name ->
+        val text = shareSummary(t.stats, label(bounds.first, bounds.second), slices.map { it.name.ifBlank { t.unlabeled } to it.millis }) { name ->
             val project = rows.alive(KIND_PROJECT).find { it.f("name") == name }
             rows.alive(KIND_GROUP).find { it.id == project?.f("groupId") }?.f("name").orEmpty()
         }
         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), t.share))
     }
-    val charts: @Composable () -> Unit = {
-        val bar = MaterialTheme.colorScheme.primary
-        val hot = MaterialTheme.colorScheme.tertiary
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(if (pickedBar in bars.indices) weekDays[pickedBar].toString() + " · " + clockWords(bars[pickedBar]) else t.week, style = MaterialTheme.typography.titleMedium)
-            Canvas(
-                Modifier.fillMaxWidth().height(160.dp)
-                    .pointerInput(weekShift) {
-                        detectHorizontalDragGestures { _, dx ->
-                            drag.floatValue += dx
-                            if (drag.floatValue > 80f) {
-                                weekShift += 1
-                                drag.floatValue = 0f
-                            }
-                            if (drag.floatValue < -80f && weekShift > 0) {
-                                weekShift -= 1
-                                drag.floatValue = 0f
-                            }
+    fun add() { if (selectedDay > today) note = t.future else { manual = true; note = "" } }
+    val chart: @Composable () -> Unit = {
+        SectionCard(t.byDay) {
+            Text("${t.week}: ${label(week.first, week.second)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val maxMinutes = (kotlin.math.ceil((bars.maxOrNull() ?: 0L) / 600_000.0).toInt() * 10).coerceAtLeast(10)
+            val accent = MaterialTheme.colorScheme.primary
+            val outline = MaterialTheme.colorScheme.outlineVariant
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.height(160.dp).widthIn(min = 32.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                    Text("$maxMinutes", style = MaterialTheme.typography.labelSmall)
+                    Text("${maxMinutes / 2}", style = MaterialTheme.typography.labelSmall)
+                    Text("0", style = MaterialTheme.typography.labelSmall)
+                }
+                Column(Modifier.weight(1f)) {
+                    Canvas(Modifier.fillMaxWidth().height(160.dp).semantics {
+                        contentDescription = days.indices.joinToString("; ") { "${days[it]}: ${clockWords(bars[it])}" }
+                    }.pointerInput(bars) { detectTapGestures { offset -> pickedBar = (offset.x / (size.width / 7f)).toInt().coerceIn(0,6) } }) {
+                        repeat(3) { i -> val y = size.height * i / 2; drawLine(outline, Offset(0f,y), Offset(size.width,y), 1.dp.toPx()) }
+                        val slot = size.width / 7f
+                        bars.forEachIndexed { index, ms ->
+                            val h = (ms.toFloat() / (maxMinutes * 60_000f)).coerceIn(0f,1f) * (size.height - 4.dp.toPx())
+                            if (h > 0) drawRoundRect(accent.copy(alpha = if (pickedBar == index || pickedBar == -1) 1f else 0.5f),
+                                Offset(index * slot + slot * 0.2f, size.height - h), Size(slot * 0.6f, h), androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
                         }
                     }
-                    .pointerInput(bars) {
-                        detectTapGestures { offset ->
-                            pickedBar = ((offset.x / (size.width / 7f)).toInt()).coerceIn(0, 6)
-                        }
-                    },
-            ) {
-                val max = bars.maxOrNull()?.coerceAtLeast(1L) ?: 1L
-                val gap = 12f
-                val w = (size.width - gap * 6) / 7f
-                bars.forEachIndexed { index, value ->
-                    val h = (value.toFloat() / max.toFloat()) * size.height
-                    drawRoundRect(
-                        color = if (index == pickedBar) hot else bar,
-                        topLeft = Offset(index * (w + gap), size.height - h),
-                        size = Size(w, h),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f),
-                    )
+                    Row(Modifier.fillMaxWidth()) { days.forEach { Text(it.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 1) } }
                 }
             }
-            Row {
-                TextButton(onClick = { weekShift += 1 }) { Text(t.back) }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = { if (weekShift > 0) weekShift -= 1 }, enabled = weekShift > 0) { Text(t.today) }
-            }
+            Text(if (bars.all { it == 0L }) t.emptyRange else t.minutes, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (pickedBar in days.indices) Text("${days[pickedBar].format(dateFormat)}: ${clockWords(bars[pickedBar])}", style = MaterialTheme.typography.bodyMedium)
         }
     }
-    val pie: @Composable () -> Unit = {
-        val darkChart = MaterialTheme.colorScheme.background.isDark()
-        val sliceColors = slices.map { slice ->
-            chartColor(rows.alive(KIND_PROJECT).find { it.id == slice.id }?.f("color") ?: "C8922A", darkChart)
-        }
-        val center = if (pickedSlice in slices.indices) {
-            slices[pickedSlice].name.ifBlank { t.unlabeled } + "\n" + clockWords(slices[pickedSlice].millis) + " · " + percents.getOrElse(pickedSlice) { 0 } + "%"
-        } else if (slices.isEmpty()) {
-            t.emptyRange
-        } else {
-            clockWords(total)
-        }
-        Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-            Canvas(
-                Modifier.size(200.dp)
-                    .pointerInput(slices, total) {
-                        detectTapGestures { offset ->
-                            if (total <= 0) return@detectTapGestures
-                            val angle = (Math.toDegrees(atan2((offset.y - size.height / 2f).toDouble(), (offset.x - size.width / 2f).toDouble())) + 450.0) % 360.0
-                            var cursor = 0.0
-                            slices.forEachIndexed { index, slice ->
-                                cursor += slice.millis * 360.0 / total
-                                if (angle <= cursor) {
-                                    pickedSlice = index
-                                    return@detectTapGestures
-                                }
-                            }
-                        }
+    val projectChart: @Composable () -> Unit = {
+        SectionCard(t.byProject) {
+            val colors = slices.map { slice -> chartColor(rows.alive(KIND_PROJECT).find { it.id == slice.id }?.f("color") ?: "14614A", MaterialTheme.colorScheme.background.isDark()) }
+            val track = MaterialTheme.colorScheme.outlineVariant
+            Box(Modifier.fillMaxWidth().height(196.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.size(176.dp).padding(12.dp).pointerInput(slices) {
+                    detectTapGestures { offset ->
+                        if (total <= 0) return@detectTapGestures
+                        val angle = (Math.toDegrees(atan2((offset.y-size.height/2).toDouble(), (offset.x-size.width/2).toDouble())) + 450) % 360
+                        var edge = 0.0
+                        for (i in slices.indices) { edge += slices[i].millis * 360.0 / total; if (angle <= edge) { pickedSlice = i; break } }
                     }
-                    .pointerInput(range) {
-                        detectHorizontalDragGestures { _, dx ->
-                            drag.floatValue += dx
-                            if (drag.floatValue > 80f || drag.floatValue < -80f) {
-                                val step = if (drag.floatValue > 0) -1 else 1
-                                range = (range + step).mod(4)
-                                drag.floatValue = 0f
-                            }
-                        }
-                    },
-            ) {
-                if (total > 0) {
-                    var start = -90f
-                    slices.forEachIndexed { index, slice ->
-                        val sweep = slice.millis.toFloat() / total * 360f
-                        drawArc(sliceColors[index], start, sweep, true)
-                        start += sweep
+                }.semantics { contentDescription = slices.joinToString("; ") { "${it.name}: ${clockWords(it.millis)}" }.ifBlank { t.emptyRange } }) {
+                    val stroke = Stroke(18.dp.toPx())
+                    if (total <= 0) drawArc(track, -90f, 360f, false, style = stroke)
+                    else {
+                        var start = -90f
+                        slices.forEachIndexed { i, slice -> val sweep = slice.millis.toFloat() / total * 360f; drawArc(colors[i], start, sweep, false, style = stroke); start += sweep }
                     }
                 }
+                Text(clockWords(total), style = MaterialTheme.typography.titleLarge)
             }
-            Text(center, textAlign = TextAlign.Center, modifier = Modifier.padding(48.dp))
+            if (slices.isEmpty()) Text(t.emptyRange, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            slices.forEachIndexed { i, slice ->
+                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { pickedSlice = i }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(colors[i]))
+                    Text(slice.name.ifBlank { t.unlabeled }, Modifier.weight(1f))
+                    Text(clockWords(slice.millis), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            if (pickedSlice in slices.indices) Text("${slices[pickedSlice].name.ifBlank { t.unlabeled }}: ${percents[pickedSlice]}%", style = MaterialTheme.typography.bodyMedium)
         }
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-            listOf(t.today, t.week, t.month, t.year).forEachIndexed { index, label ->
-                PresenceChip(selected = range == index, onClick = {
-                    if (index > 0 && !premium) onGate() else range = index
-                }, label = { Text(label) })
-            }
+    val selectedSessions = closed.filter { it.f("startedAt").toLongOrNull()?.let { dayKey(it, zone, dayStart) == selectedDay } == true }.sortedBy { it.f("startedAt").toLongOrNull() }
+    val dayDetail: @Composable () -> Unit = {
+        SectionCard {
+            Text(selectedDay.format(dateFormat), style = MaterialTheme.typography.titleLarge)
+            Metric(t.focusTime, clockWords(dayTotals(rows, listOf(selectedDay), zone, dayStart).single()))
+            PresenceButton({ add() }) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.manual) }
+            TextButton({ share() }) { Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text("${t.share} · ${listOf(t.today,t.week,t.month,t.year)[range]}") }
+            Text(t.onlyFocus, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (note.isNotEmpty()) Text(note, color = MaterialTheme.colorScheme.error)
         }
-        Text(clockWords(total), style = MaterialTheme.typography.displayLarge)
-        if (slices.isEmpty()) Text(t.emptyRange) else slices.forEach { slice ->
-            Text((slice.name.ifBlank { t.unlabeled }) + " · " + clockWords(slice.millis))
-        }
-        if (!premium) {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shape = MaterialTheme.shapes.large) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(t.charts, style = MaterialTheme.typography.titleMedium)
-                    PresenceButton(onClick = onGate) { Text(t.openSwitch) }
+    }
+    PresenceList(Modifier.fillMaxSize().padding(horizontal = LocalUiLayout.current.margin), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item(key = "period") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(t.today,t.week,t.month,t.year).forEachIndexed { i,title -> PresenceChip(range == i, { range = i; pickedSlice = -1 }, { Text(title) }) }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton({ navigate(-1) }) { Icon(Icons.Outlined.ChevronLeft, t.previous) }
+                    Text(label(bounds.first,bounds.second), Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
+                    IconButton({ navigate(1) }, enabled = bounds.second < today) { Icon(Icons.Outlined.ChevronRight, t.next) }
                 }
             }
-        } else if (wide) {
+        }
+        item(key = "actions") {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton({ share() }) { Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text("${t.share} · ${listOf(t.today,t.week,t.month,t.year)[range]}") }
+                TonalButton({ add() }) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.manual) }
+            }
+        }
+        item(key = "totals") {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(Modifier.weight(1f)) { charts() }
-                Column(Modifier.weight(1f)) { pie() }
-            }
-            CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it })
-        } else {
-            charts()
-            pie()
-            CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it })
-        }
-        if (premium) {
-            val logicalToday = today
-            if (wide) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    PresenceButton(onClick = { share() }, modifier = Modifier.heightIn(min = 52.dp)) { Text(t.share) }
-                    PresenceButton(onClick = {
-                        if (selectedDay > logicalToday) note = t.future else manual = true
-                    }, modifier = Modifier.heightIn(min = 52.dp)) { Text(t.manual) }
-                }
-            } else {
-                PresenceButton(onClick = { share() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.share) }
-                PresenceButton(onClick = {
-                    if (selectedDay > logicalToday) note = t.future else manual = true
-                }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.manual) }
+                SectionCard(modifier = Modifier.weight(1f)) { Metric(t.focusTime, clockWords(total)) }
+                SectionCard(modifier = Modifier.weight(1f)) { Metric(t.sessions, count.toString()) }
             }
         }
-        if (note.isNotEmpty()) Text(note)
-        rows.alive(KIND_SESSION).filter {
-            val start = it.f("startedAt").toLongOrNull() ?: return@filter false
-            dayKey(start, zone, dayStart) == selectedDay && it.f("endedAt").isNotEmpty()
-        }.take(12).forEach { session ->
-            Text(session.f("projectName").ifBlank { t.unlabeled } + " · " + phase(t, session.f("kind")) + " · " + clockWords(sessionCountedMillis(session)))
+        item(key = "charts") {
+            if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(Modifier.weight(1.2f)) { chart() }; Box(Modifier.weight(1f)) { projectChart() }
+            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { chart(); projectChart() }
+        }
+        item(key = "calendar") {
+            val calendar: @Composable () -> Unit = { SectionCard { CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it; anchor = it; pickedBar = -1 }) } }
+            if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(Modifier.weight(1.2f)) { calendar() }; Box(Modifier.weight(1f)) { dayDetail() }
+            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { calendar(); dayDetail() }
+        }
+        items(selectedSessions, key = { "session-${it.id}" }) { rec ->
+            SectionCard { Text(rec.f("projectName").ifBlank { t.unlabeled }); Text("${phase(t,rec.f("kind"))}: ${clockWords(sessionCountedMillis(rec))}", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
-    if (manual) ManualDialog(t, rows, selectedDay, dayStart, snap, { manual = false }) { message ->
-        note = message
-        if (message.isEmpty()) manual = false
-    }
+    if (manual) ManualDialog(t, rows, selectedDay, dayStart, snap, { manual = false }) { message -> note = message; if (message.isEmpty()) manual = false }
 }
 
 @Composable
-private fun CalendarBlock(
-    t: T,
-    rows: List<Rec>,
-    month: YearMonth,
-    selected: LocalDate,
-    zone: ZoneId,
-    dayStart: Int,
-    onMonth: (YearMonth) -> Unit,
-    onDay: (LocalDate) -> Unit,
-) {
-    var drag by remember { mutableFloatStateOf(0f) }
-    val first = month.atDay(1)
-    val pad = (first.dayOfWeek.value + 6) % 7
-    Column(Modifier.pointerInput(month) {
-        detectHorizontalDragGestures { _, dx ->
-            drag += dx
-            if (drag > 80f) {
-                onMonth(month.minusMonths(1))
-                drag = 0f
-            }
-            if (drag < -80f) {
-                onMonth(month.plusMonths(1))
-                drag = 0f
-            }
-        }
-    }) {
+private fun CalendarBlock(t: T, rows: List<Rec>, month: YearMonth, selected: LocalDate, zone: ZoneId, dayStart: Int, onMonth: (YearMonth) -> Unit, onDay: (LocalDate) -> Unit) {
+    val pad = month.atDay(1).dayOfWeek.value - 1
+    val marked = rows.filter { sessionCountedMillis(it) > 0 }.mapNotNull { it.f("startedAt").toLongOrNull()?.let { start -> dayKey(start, zone, dayStart) } }.toSet()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { onMonth(month.minusMonths(1)) }) { Text(t.back) }
-            Text(month.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + month.year, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = { onMonth(month.plusMonths(1)) }) { Text("→") }
+            IconButton({ onMonth(month.minusMonths(1)) }) { Icon(Icons.Outlined.ChevronLeft,t.previous) }
+            Text(month.atDay(1).format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+            IconButton({ onMonth(month.plusMonths(1)) }) { Icon(Icons.Outlined.ChevronRight,t.next) }
         }
-        val marked = rows.alive(KIND_SESSION).mapNotNull {
-            val start = it.f("startedAt").toLongOrNull() ?: return@mapNotNull null
-            if (sessionCountedMillis(it) <= 0) null else dayKey(start, zone, dayStart)
-        }.toSet()
-        Column {
-            for (week in 0 until 6) {
-                Row(Modifier.fillMaxWidth()) {
-                    for (dow in 0 until 7) {
-                        val index = week * 7 + dow - pad
-                        val date = if (index in 0 until month.lengthOfMonth()) month.atDay(index + 1) else null
-                        Box(
-                            Modifier.weight(1f).height(44.dp).clickable(enabled = date != null) { date?.let(onDay) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (date != null) {
-                                Text(
-                                    date.dayOfMonth.toString(),
-                                    color = when {
-                                        date == selected -> MaterialTheme.colorScheme.primary
-                                        date in marked -> MaterialTheme.colorScheme.tertiary
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    },
-                                )
+        Row {
+            (1..7).forEach { Text(java.time.DayOfWeek.of(it).getDisplayName(TextStyle.NARROW,Locale.getDefault()), Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        repeat((pad + month.lengthOfMonth() + 6) / 7) { week ->
+            Row {
+                repeat(7) { dow ->
+                    val number = week * 7 + dow - pad + 1
+                    val date = if (number in 1..month.lengthOfMonth()) month.atDay(number) else null
+                    Box(Modifier.weight(1f).heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                        if (date != null) Surface(onClick = { onDay(date) }, shape = CircleShape,
+                            color = if (date == selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = date.toString() }) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                Text(number.toString(), style = MaterialTheme.typography.bodyMedium)
+                                Box(Modifier.size(4.dp).clip(CircleShape).background(if (date in marked) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent))
                             }
                         }
                     }
@@ -1292,26 +1124,30 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
     val context = LocalContext.current
     val app = context.applicationContext as PresenceApp
     val projects = rows.alive(KIND_PROJECT)
-    var startHour by remember { mutableIntStateOf(dayStart) }
-    var startMinute by remember { mutableIntStateOf(0) }
-    var project by remember { mutableStateOf(projects.firstOrNull()?.id.orEmpty()) }
-    var hours by remember { mutableIntStateOf(0) }
-    var mins by remember { mutableIntStateOf(25) }
-    var kind by remember { mutableStateOf("focus") }
-    var error by remember { mutableStateOf("") }
-    AlertDialog(
+    var entryDay by rememberSaveable(stateSaver = DateSaver) { mutableStateOf(day) }
+    var startHour by rememberSaveable { mutableIntStateOf(dayStart) }
+    var startMinute by rememberSaveable { mutableIntStateOf(0) }
+    var project by rememberSaveable { mutableStateOf(projects.firstOrNull()?.id.orEmpty()) }
+    var hours by rememberSaveable { mutableIntStateOf(0) }
+    var mins by rememberSaveable { mutableIntStateOf(25) }
+    var kind by rememberSaveable { mutableStateOf("focus") }
+    var error by rememberSaveable { mutableStateOf("") }
+    PresenceDialog(
         onDismissRequest = onClose,
         title = { Text(t.manual) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                projects.forEach { item ->
-                    PresenceChip(selected = project == item.id, onClick = { project = item.id }, label = { Text(item.f("name")) })
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                MenuField(t.projects, t.chooseProject, projects.find { it.id == project }?.f("name") ?: t.unlabeled,
+                    listOf("" to t.unlabeled) + projects.map { it.id to it.f("name") }) { project = it }
+                TextButton(onClick = {
+                    DatePickerDialog(context, { _, y, m, d -> entryDay = LocalDate.of(y, m + 1, d) }, entryDay.year, entryDay.monthValue - 1, entryDay.dayOfMonth).show()
+                }) { Text(entryDay.toString()) }
                 TextButton(onClick = {
                     TimePickerDialog(context, { _, h, m -> startHour = h; startMinute = m }, startHour, startMinute, true).show()
                 }) { Text("${t.sessionStart}: ${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}") }
                 CountStepper(t, t.hours, hours, 0, 12) { hours = it }
                 CountStepper(t, t.minutes, mins, 0, 59) { mins = it }
+                Text(t.pastEntryHelp, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
                 Row {
                     PresenceChip(selected = kind == "focus", onClick = { kind = "focus" }, label = { Text(t.focus) })
@@ -1324,7 +1160,7 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
             TextButton(onClick = {
                 val duration = (hours * 60L + mins) * 60_000L
                 val zone = ZoneId.systemDefault()
-                val calendarDay = if (startHour < dayStart) day.plusDays(1) else day
+                val calendarDay = if (startHour < dayStart) entryDay.plusDays(1) else entryDay
                 val start = calendarDay.atTime(startHour, startMinute).atZone(zone).toInstant().toEpochMilli()
                 when {
                     duration < 60_000L -> run { error = t.atLeast }
@@ -1359,70 +1195,47 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
 @Composable
 private fun TodosPage(app: PresenceApp, t: T, rows: List<Rec>, wide: Boolean) {
     val context = LocalContext.current
-    var draft by remember { mutableStateOf("") }
-    val items = rows.filter { it.kind == KIND_LOCAL && it.id.startsWith("todo:") && !it.deleted }
-        .sortedBy { it.f("sort").toLongOrNull() ?: it.updatedAt }
-    val editor: @Composable () -> Unit = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(t.todos, style = MaterialTheme.typography.headlineMedium)
-            OutlinedTextField(colors = presenceFieldColors(), 
-                value = draft,
-                onValueChange = { draft = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(t.todoHint) },
-                singleLine = true,
-            )
-            PresenceButton(
-                onClick = {
-                    app.repo.addTodo(draft)
-                    draft = ""
-                    HomeWidgets.update(context)
-                },
-                enabled = draft.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            ) { Text(t.addItem) }
-        }
+    var draft by rememberSaveable { mutableStateOf("") }
+    var menu by rememberSaveable { mutableStateOf<String?>(null) }
+    var deleting by rememberRecordState()
+    val todos = rows.filter { it.kind == KIND_LOCAL && it.id.startsWith("todo:") && !it.deleted }.sortedBy { it.f("sort").toLongOrNull() ?: it.updatedAt }
+    fun add() {
+        if (draft.isBlank()) return
+        app.repo.addTodo(draft); draft = ""; HomeWidgets.update(context)
     }
-    val list: @Composable () -> Unit = {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (items.isEmpty()) {
-                Text(t.emptyTodos, color = MaterialTheme.colorScheme.onSurface)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 800.dp).fillMaxSize().padding(horizontal = LocalUiLayout.current.margin, vertical = if (LocalUiLayout.current.short && LocalUiLayout.current.keyboard) 0.dp else LocalUiLayout.current.margin), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(draft, { draft = it }, modifier = Modifier.weight(1f), label = { Text(t.todoHint) }, singleLine = true,
+                    colors = presenceFieldColors(), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { add() }))
+                PresenceButton({ add() }, enabled = draft.isNotBlank(), modifier = Modifier.size(56.dp), contentPadding = PaddingValues(0.dp)) { Icon(Icons.Outlined.Add, t.addItem) }
             }
-            items.forEach { item ->
-                val id = item.id.removePrefix("todo:")
-                val done = item.f("done") == "1"
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Checkbox(checked = done, onCheckedChange = {
-                        app.repo.setTodoDone(id, it)
-                        HomeWidgets.update(context)
-                    })
-                    Text(
-                        item.f("title"),
-                        modifier = Modifier.weight(1f),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    TextButton(onClick = {
-                        app.repo.deleteTodo(id)
-                        HomeWidgets.update(context)
-                    }) {
-                        Icon(Icons.Filled.Delete, t.delete)
+            if (todos.isEmpty()) SectionCard { Text(t.emptyTodos, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            PresenceList(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
+                items(todos, key = { it.id }) { item ->
+                    val id = item.id.removePrefix("todo:")
+                    val done = item.f("done") == "1"
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(done, { app.repo.setTodoDone(id, it); HomeWidgets.update(context) })
+                            Text(item.f("title"), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge.copy(textDecoration = if (done) TextDecoration.LineThrough else null),
+                                color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                            Box {
+                                IconButton({ menu = id }) { Icon(Icons.Outlined.MoreVert, t.actions) }
+                                DropdownMenu(menu == id, { menu = null }) {
+                                    DropdownMenuItem(text = { Text(t.delete) }, onClick = { menu = null; deleting = item })
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    if (wide) {
-        Row(Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(Modifier.weight(1f)) { editor() }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { list() }
-        }
-    } else {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            editor()
-            list()
-        }
-    }
+    deleting?.let { item -> Confirm(t.delete, item.f("title"), t.delete, t.cancel, {
+        app.repo.deleteTodo(item.id.removePrefix("todo:")); HomeWidgets.update(context); deleting = null
+    }, { deleting = null }) }
 }
 
 @Composable
@@ -1455,7 +1268,7 @@ private fun ReminderRow(
                 contentColor = scheme.onSurface,
                 border = BorderStroke(1.dp, scheme.outline),
                 shape = MaterialTheme.shapes.large,
-                modifier = Modifier.clickable {
+                modifier = Modifier.heightIn(min = 48.dp).clickable {
                     TimePickerDialog(context, { _, h, m -> onTime(h, m) }, hour, minute, true).show()
                 },
             ) {
@@ -1476,7 +1289,7 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
     val scope = rememberCoroutineScope()
     val globals = app.repo.globals()
     val flags = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.body.orEmpty()
-    var note by remember { mutableStateOf("") }
+    var note by rememberSaveable { mutableStateOf("") }
     fun fileOperation(block: () -> Unit) {
         scope.launch {
             try { withContext(Dispatchers.IO) { block() } }
@@ -1539,45 +1352,8 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
     val language = flags["language"] ?: "system"
     val storage by app.repo.storage().collectAsState()
     LaunchedEffect(Unit) { app.repo.refreshStorage() }
-    val storagePane: @Composable () -> Unit = {
-        Text(t.sdCard, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        val storageBody = when {
-            storage.cardMissing -> t.sdMissing
-            storage.onCard -> t.sdOnCard
-            storage.cardPresent -> t.sdPresent
-            else -> t.sdNone
-        }
-        Text(storageBody, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
-        if (storage.cardPresent && !storage.onCard && !storage.cardMissing) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PresenceButton(onClick = {
-                    note = when (app.repo.moveToSd()) {
-                        "moved" -> t.sdOnCard
-                        "no-card" -> t.sdNone
-                        "missing" -> t.sdMissing
-                        else -> t.sdFailed
-                    }
-                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdMove) }
-                Explain(t.sdMoveHelp)
-            }
-        }
-        if (storage.onCard && storage.cardPresent) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PresenceButton(onClick = {
-                    note = when (app.repo.moveToInternal()) {
-                        "moved" -> t.sdPresent
-                        else -> t.sdFailed
-                    }
-                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdInternal) }
-                Explain(t.sdInternalHelp)
-            }
-        }
-        if (storage.cardMissing) {
-            PresenceButton(onClick = { app.repo.refreshStorage() }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdCheck) }
-        }
-    }
     val timerPane: @Composable () -> Unit = {
-        Text(t.timerSettings, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+        SectionCard(t.timerDefaults) {
         PlanSections(
             t = t,
             workSec = globals.workMillis / 1000L,
@@ -1591,8 +1367,20 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             onShort = { app.repo.setPref("short_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
             onLong = { app.repo.setPref("long_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
         )
+        SwitchSetting(t.countUp, t.countUpHelp, globals.countUp) {
+            app.repo.setPref("count_up", if (it) "1" else "0")
+            app.center.refreshSettings()
+        }
+        SwitchSetting(t.autoContinue, t.autoHelp, globals.auto) {
+            app.repo.setPref("auto_start", if (it) "1" else "0")
+            app.center.refreshSettings()
+        }
         Stepper(t, t.dayStarts, t.dayHelp, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
-        Text(t.reminders, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+            Text(t.nextSitting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { app.repo.resetSettings(); app.center.refreshSettings(); Reminders.reschedule(context); note = t.resetDone }) { Text(t.resetSettings) }
+        }
+    }
+    val reminderPane: @Composable () -> Unit = { SectionCard(t.reminders) {
         ReminderRow(t.dailyReminder, t.dailyHelp, globals.dailyOn, globals.dailyHour, globals.dailyMinute, { on ->
             if (on) askNotify()
             app.repo.setPref("daily_on", if (on) "1" else "0")
@@ -1611,22 +1399,14 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             app.repo.setPref("streak_minute", minute.toString())
             Reminders.reschedule(context)
         }
-        Setting(t.resetSettings, t.resetHelp) {
-            PresenceButton(onClick = {
-                app.repo.resetSettings()
-                app.center.refreshSettings()
-                Reminders.reschedule(context)
-                note = t.resetDone
-            }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.resetSettings) }
-        }
-    }
-    val otherPane: @Composable () -> Unit = {
+    } }
+    val appearancePane: @Composable () -> Unit = { SectionCard(t.appearance) {
         val themeLabel = when (theme) {
             "light" -> t.light
             "dark" -> t.dark
             else -> t.followSystem
         }
-        MenuField(t.appearance, t.themeMenuHelp, themeLabel, listOf("light" to t.light, "dark" to t.dark, "system" to t.followSystem)) {
+        MenuField(t.themeChoice, t.themeMenuHelp, themeLabel, listOf("light" to t.light, "dark" to t.dark, "system" to t.followSystem)) {
             app.repo.updateFlags { flags -> flags["theme"] = it }
         }
         val paletteNames = listOf(
@@ -1666,7 +1446,8 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
         MenuField(t.language, t.languageMenuHelp, languages.find { it.first == language }?.second ?: t.system, languages) {
             app.repo.updateFlags { flags -> flags["language"] = it }
         }
-        Text(t.sounds, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+    } }
+    val soundPane: @Composable () -> Unit = { SectionCard(t.sounds) {
         val alarmLabel = when (globals.alarm) {
             "bell" -> t.bell
             "pulse" -> t.pulse
@@ -1686,47 +1467,76 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             app.repo.setPref("background", it)
             app.center.catchUp()
         }
-        Stepper(t, t.volume, t.volumeHelp, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()); app.center.catchUp() }
-        Text(t.data, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        Setting(t.exportJson, t.exportJsonHelp) {
-            PresenceButton(onClick = { exportJson.launch("presence-backup.json") }) { Text(t.exportJson) }
+        Text("${t.volume}: ${globals.volume}%", style = MaterialTheme.typography.bodyMedium)
+        Slider(value = globals.volume.toFloat(), onValueChange = { app.repo.setPref("bg_volume", it.toInt().toString()); app.center.catchUp() }, valueRange = 0f..100f, modifier = Modifier.semantics { contentDescription = t.volume })
+    } }
+    val dataPane: @Composable () -> Unit = { SectionCard(t.data) {
+        ActionRow(t.exportJson, "JSON", Icons.Outlined.FileUpload) { exportJson.launch("presence-backup.json") }
+        ActionRow(t.exportCsv, "CSV", Icons.Outlined.TableChart) { exportCsv.launch("presence-sessions.csv") }
+        ActionRow(t.importJson, "JSON", Icons.Outlined.FileDownload) { importJson.launch(arrayOf("application/json", "text/*", "*/*")) }
+        if (note.isNotEmpty()) Text(note, color = MaterialTheme.colorScheme.primary)
+    } }
+    val devicesPane: @Composable () -> Unit = { SectionCard(t.devices) { ActionRow(t.pair, t.pairHelp, Icons.Outlined.Wifi, onPair) } }
+    val storagePane: @Composable () -> Unit = { SectionCard(t.storage) {
+        val storageBody = when {
+            storage.cardMissing -> t.sdMissing
+            storage.onCard -> t.sdOnCard
+            storage.cardPresent -> t.sdPresent
+            else -> t.sdNone
         }
-        Setting(t.exportCsv, t.exportCsvHelp) {
-            PresenceButton(onClick = { exportCsv.launch("presence-sessions.csv") }) { Text(t.exportCsv) }
-        }
-        Setting(t.importJson, t.importHelp) {
-            PresenceButton(onClick = { importJson.launch(arrayOf("application/json", "text/*", "*/*")) }) { Text(t.importJson) }
-        }
-        if (note.isNotEmpty()) Text(note, color = MaterialTheme.colorScheme.onSurface)
-        Text(t.devices, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        Setting(t.pair, t.pairHelp) {
-            PresenceButton(onClick = onPair, modifier = Modifier.heightIn(min = 52.dp)) { Text(t.pair) }
-        }
-        Text(t.about, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-        Text(t.aboutBody, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
-    }
-    if (wide) {
-        Row(Modifier.fillMaxSize()) {
-            Column(
-                Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                storagePane()
-                timerPane()
+        Text(storageBody, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+        if (storage.cardPresent && !storage.onCard && !storage.cardMissing) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PresenceButton(onClick = {
+                    note = when (app.repo.moveToSd()) {
+                        "moved" -> t.sdOnCard
+                        "no-card" -> t.sdNone
+                        "missing" -> t.sdMissing
+                        else -> t.sdFailed
+                    }
+                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdMove) }
+                Explain(t.sdMoveHelp)
             }
-            Column(
-                Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) { otherPane() }
         }
-    } else {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            storagePane()
-            timerPane()
-            otherPane()
+        if (storage.onCard && storage.cardPresent) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PresenceButton(onClick = {
+                    note = when (app.repo.moveToInternal()) {
+                        "moved" -> t.sdPresent
+                        else -> t.sdFailed
+                    }
+                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdInternal) }
+                Explain(t.sdInternalHelp)
+            }
+        }
+        if (storage.cardMissing) {
+            PresenceButton(onClick = { app.repo.refreshStorage() }, modifier = Modifier.heightIn(min = 48.dp)) { Text(t.sdCheck) }
+        }
+    } }
+    val aboutPane: @Composable () -> Unit = { SectionCard(t.about) {
+        Text("Presence", style = MaterialTheme.typography.titleMedium)
+        Text(t.aboutBody, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Apache License 2.0", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } }
+    PresenceList(Modifier.fillMaxSize().padding(horizontal = LocalUiLayout.current.margin), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (wide) {
+            item(key = "top") {
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { timerPane() }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { reminderPane(); appearancePane() }
+                }
+            }
+            item(key = "bottom") {
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { soundPane(); dataPane() }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { devicesPane(); storagePane(); aboutPane() }
+                }
+            }
+        } else {
+            item(key = "timer") { timerPane() }; item(key = "reminders") { reminderPane() }
+            item(key = "appearance") { appearancePane() }; item(key = "sounds") { soundPane() }
+            item(key = "data") { dataPane() }; item(key = "devices") { devicesPane() }
+            item(key = "storage") { storagePane() }; item(key = "about") { aboutPane() }
         }
     }
 }
@@ -1744,10 +1554,10 @@ private fun Explain(text: String) {
     ) {
         IconButton(
             onClick = { scope.launch { state.show() } },
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(48.dp),
         ) {
             Icon(
-                Icons.Filled.Visibility,
+                Icons.Outlined.Info,
                 contentDescription = text,
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurface,
@@ -1764,41 +1574,20 @@ private fun MenuField(
     options: List<Pair<String, String>>,
     onPick: (String) -> Unit,
 ) {
-    var open by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-            Explain(help)
-        }
-        Box(Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = presenceFieldColors(),
-            )
-            Box(Modifier.matchParentSize().semantics { contentDescription = title }.clickable { open = true })
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                options.forEach { (id, label) ->
-                    DropdownMenuItem(text = { Text(label) }, onClick = { open = false; onPick(id) })
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box {
+        Surface(onClick = { open = true }, color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.heightIn(min = 56.dp).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(value, style = MaterialTheme.typography.bodyLarge)
                 }
+                Icon(Icons.Outlined.ExpandMore, title)
             }
         }
-    }
-}
-
-@Composable
-private fun Setting(title: String, help: String, control: @Composable () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(title, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-        Explain(help)
-        control()
+        DropdownMenu(open, { open = false }) {
+            options.forEach { (id, label) -> DropdownMenuItem(text = { Text(label) }, onClick = { open = false; onPick(id) }) }
+        }
     }
 }
 
@@ -1823,13 +1612,15 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
     val offer by app.lan.offer.collectAsState()
     val until by app.lan.offerUntil.collectAsState()
     val message by app.lan.message.collectAsState()
-    var digits by remember { mutableStateOf("") }
-    var now by remember { mutableIntStateOf(0) }
+    var digits by rememberSaveable { mutableStateOf("") }
+    var now by rememberSaveable { mutableIntStateOf(0) }
+    var denied by rememberSaveable { mutableStateOf(false) }
     var afterGrant by remember { mutableStateOf<(() -> Unit)?>(null) }
     val nearbyPermission = Manifest.permission.NEARBY_WIFI_DEVICES
     val askNearby = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val next = afterGrant
         afterGrant = null
+        denied = !granted
         if (granted) next?.invoke()
     }
     val withLink: (() -> Unit) -> Unit = { block ->
@@ -1847,41 +1638,60 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
     }
     val leftMs = (until - System.currentTimeMillis()).coerceAtLeast(0)
     val peers = rows.filter { it.kind == KIND_LOCAL && it.id.startsWith("peer:") && !it.deleted && it.f("token").isNotEmpty() }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (now < 0) return@Column
-        PresenceButton(onClick = { withLink { app.lan.showCode() } }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(t.showCode) }
-        if (offer != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(offer!!, style = MaterialTheme.typography.displayLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Explain(t.offerHelp)
-            }
-            Text(t.expiresIn(clockDigits(leftMs)), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-            TextButton(onClick = { app.lan.hideCode() }) { Text(t.cancel) }
-        } else if (message == "expired") {
-            Text(t.expired)
-            PresenceButton(onClick = { withLink { app.lan.showCode() } }) { Text(t.newCode) }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(digits, { if (it.length <= 4 && it.all { ch -> ch in '0'..'9' }) digits = it }, label = { Text(t.enterCode) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.weight(1f), colors = presenceFieldColors())
-            Explain(t.enterHelp)
-        }
-        PresenceButton(onClick = { withLink { app.lan.enter(digits) } }, enabled = digits.length == 4 && message != "syncing", modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pairAction) }
-        if (message.isNotEmpty() && message != "expired") Text(t.pairMessage(message))
-        Text(t.devices, style = MaterialTheme.typography.titleLarge)
-        if (peers.isEmpty()) Text(t.noPeers)
-        peers.forEach { peer ->
-            val id = peer.id.removePrefix("peer:")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(peer.f("name").ifBlank { "Presence" })
-                    val last = peer.f("lastSync").toLongOrNull() ?: 0L
-                    if (last > 0) Text(clockDigits(System.currentTimeMillis() - last))
-                }
-                TextButton(onClick = { withLink { app.lan.syncNow(id) } }) { Text(t.syncNow) }
-                TextButton(onClick = { app.repo.forgetPeer(id) }) { Text(t.forget) }
+    var forgetting by rememberRecordState()
+    val show: @Composable () -> Unit = {
+        SectionCard(t.showCode) {
+            Text(t.offerHelp, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (offer != null) {
+                Text(offer!!, style = MaterialTheme.typography.displayMedium.copy(fontFeatureSettings = "tnum", letterSpacing = 6.sp), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Text(t.expiresIn(clockDigits(leftMs)), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton({ app.lan.hideCode() }) { Text(t.cancel) }
+            } else {
+                if (message == "expired") Text(t.expired)
+                PresenceButton({ withLink { app.lan.showCode() } }) { Text(if (message == "expired") t.newCode else t.showCode) }
             }
         }
     }
+    val enter: @Composable () -> Unit = {
+        SectionCard(t.enterCode) {
+            Text(t.enterHelp, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(digits, { if (it.length <= 4 && it.all { ch -> ch in '0'..'9' }) digits = it },
+                label = { Text(t.enterCode) }, singleLine = true, colors = presenceFieldColors(), modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (digits.length == 4) withLink { app.lan.enter(digits) } }))
+            PresenceButton({ withLink { app.lan.enter(digits) } }, enabled = digits.length == 4 && message != "syncing") { Text(t.pairAction) }
+        }
+    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 960.dp).fillMaxSize().presenceScroll(rememberScrollState()).padding(LocalUiLayout.current.margin), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (now < 0) return@Column
+            Text(t.pairHelp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (denied) SectionCard {
+                Text(t.nearbyDenied, color = MaterialTheme.colorScheme.error)
+                TextButton({ context.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.fromParts("package", context.packageName, null))) }) { Text(t.androidSettings) }
+            }
+            if (LocalUiLayout.current.twoPanes) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(Modifier.weight(1f)) { show() }; Box(Modifier.weight(1f)) { enter() }
+            } else { show(); enter() }
+            if (message.isNotEmpty() && message != "expired") Text(t.pairMessage(message), color = MaterialTheme.colorScheme.primary)
+            SectionCard(t.devices) {
+                if (peers.isEmpty()) Text(t.noPeers, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                peers.forEach { peer -> key(peer.id) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(peer.f("name").ifBlank { "Presence" }, style = MaterialTheme.typography.titleMedium)
+                        val last = peer.f("lastSync").toLongOrNull() ?: 0
+                        if (last > 0) Text(java.time.Instant.ofEpochMilli(last).atZone(ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofLocalizedDateTime(java.time.format.FormatStyle.SHORT)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TonalButton({ withLink { app.lan.syncNow(peer.id.removePrefix("peer:")) } }, enabled = message != "syncing") { Text(t.syncNow) }
+                            TextButton({ forgetting = peer }) { Text(t.forget) }
+                        }
+                    }
+                } }
+            }
+            Text(t.localNetwork, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    forgetting?.let { peer -> Confirm(t.forget, peer.f("name"), t.forget, t.cancel, { app.repo.forgetPeer(peer.id.removePrefix("peer:")); forgetting = null }, { forgetting = null }) }
 }
 
 @Composable
@@ -1950,14 +1760,16 @@ private fun PresenceButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
     Button(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        contentPadding = contentPadding,
         colors = presenceButtonColors(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = RoundedCornerShape(12.dp),
         content = content,
     )
 }
@@ -1967,7 +1779,7 @@ private fun TonalButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = ButtonDefaults.shape,
+    shape: Shape = RoundedCornerShape(12.dp),
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
@@ -1978,7 +1790,7 @@ private fun TonalButton(
         shape = shape,
         contentPadding = contentPadding,
         colors = presenceTonalColors(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         content = content,
     )
 }
@@ -1995,7 +1807,7 @@ private fun PresenceChip(
         selected = selected,
         onClick = onClick,
         label = label,
-        modifier = modifier,
+        modifier = modifier.heightIn(min = 48.dp),
         colors = presenceChipColors(),
         border = presenceChipBorder(enabled = true, selected = selected),
     )
@@ -2008,7 +1820,7 @@ private fun PresenceSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit)
 
 @Composable
 private fun Confirm(title: String, body: String, ok: String, cancel: String, onOk: () -> Unit, onCancel: () -> Unit) {
-    AlertDialog(
+    PresenceDialog(
         onDismissRequest = onCancel,
         title = { Text(title) },
         text = { Text(body) },
@@ -2019,14 +1831,14 @@ private fun Confirm(title: String, body: String, ok: String, cancel: String, onO
 
 @Composable
 private fun NameDialog(title: String, initial: String, t: T, onClose: () -> Unit, onSave: (String) -> Unit) {
-    var name by remember { mutableStateOf(initial) }
-    var error by remember { mutableStateOf(false) }
-    AlertDialog(
+    var name by rememberSaveable { mutableStateOf(initial) }
+    var error by rememberSaveable { mutableStateOf(false) }
+    PresenceDialog(
         onDismissRequest = onClose,
         title = { Text(title) },
         text = {
             Column {
-                OutlinedTextField(name, { name = it; error = false }, label = { Text(t.name) }, colors = presenceFieldColors())
+                OutlinedTextField(name, { name = it; error = false }, label = { Text(t.name) }, colors = presenceFieldColors(), modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onSave(name.trim()) else error = true }))
                 if (error) Text(t.giveName)
             }
         },
@@ -2040,24 +1852,27 @@ private fun NameDialog(title: String, initial: String, t: T, onClose: () -> Unit
 @Composable
 private fun GoalDialog(t: T, onClose: () -> Unit, onSave: (Int, Long) -> Unit) {
     val context = LocalContext.current
-    var hours by remember { mutableIntStateOf(10) }
-    var mins by remember { mutableIntStateOf(0) }
-    var deadline by remember { mutableStateOf(LocalDate.now().plusMonths(1)) }
-    AlertDialog(
+    var hours by rememberSaveable { mutableStateOf("10") }
+    var mins by rememberSaveable { mutableStateOf("0") }
+    var deadline by rememberSaveable(stateSaver = DateSaver) { mutableStateOf(LocalDate.now().plusMonths(1)) }
+    PresenceDialog(
         onDismissRequest = onClose,
         title = { Text(t.setGoal) },
         text = {
             Column {
-                CountStepper(t, t.hours, hours, 0, 10000) { hours = it }
-                CountStepper(t, t.minutes, mins, 0, 59) { mins = it }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(hours, { hours = it.filter { c -> c in '0'..'9' }.take(5) }, label = { Text(t.hours) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = presenceFieldColors(), modifier = Modifier.weight(1f))
+                    OutlinedTextField(mins, { mins = it.filter { c -> c in '0'..'9' }.take(2) }, label = { Text(t.minutes) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = presenceFieldColors(), modifier = Modifier.weight(1f))
+                }
+                Text(t.goalTargetHelp, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = {
                     DatePickerDialog(context, { _, y, m, d -> deadline = LocalDate.of(y, m + 1, d) }, deadline.year, deadline.monthValue - 1, deadline.dayOfMonth).show()
                 }) { Text(t.deadline + " · " + deadline) }
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                val total = hours * 60 + mins
+            TextButton(enabled = (hours.toIntOrNull() ?: 0) > 0 || (mins.toIntOrNull() ?: 0) > 0, onClick = {
+                val total = (hours.toIntOrNull() ?: 0).coerceIn(0,10000) * 60 + (mins.toIntOrNull() ?: 0).coerceIn(0,59)
                 if (total > 0) {
                     val capped = min(total, 10000 * 60)
                     val end = deadline.atTime(18, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()

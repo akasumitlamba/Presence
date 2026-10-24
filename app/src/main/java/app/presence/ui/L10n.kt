@@ -22,6 +22,28 @@ class T(lang: String) {
     private fun s(en: String, tr: String, es: String, pt: String, fr: String, ja: String, ko: String): String =
         arrayOf(en, tr, es, pt, fr, ja, ko)[i]
 
+    val goalTargetHelp = s("Your daily target adjusts as you log focus time.", "Odak süresi kaydettikçe günlük hedefiniz değişir.", "Tu meta diaria se ajusta al registrar enfoque.", "A meta diária ajusta-se à medida que regista foco.", "Votre cible quotidienne s’ajuste au temps enregistré.", "集中時間を記録すると1日の目標が調整されます。", "집중 시간을 기록하면 일일 목표가 조정됩니다.")
+    val pastEntryHelp = s("Past sessions cannot overlap recorded or running time.", "Geçmiş oturumlar kayıtlı veya çalışan süreyle çakışamaz.", "Las sesiones pasadas no pueden solaparse con tiempo registrado o en curso.", "As sessões passadas não podem sobrepor tempo registado ou em curso.", "Les séances passées ne peuvent chevaucher du temps enregistré ou en cours.", "過去のセッションは記録済み・計測中の時間と重複できません。", "지난 세션은 기록되었거나 실행 중인 시간과 겹칠 수 없습니다.")
+    val nearbyDenied = s("Allow nearby devices in Android settings to pair on Wi-Fi.", "Wi-Fi eşleştirme için Android ayarlarında yakındaki cihazlara izin verin.", "Permite dispositivos cercanos en los ajustes de Android para emparejar por Wi-Fi.", "Permita dispositivos próximos nas definições Android para emparelhar por Wi-Fi.", "Autorisez les appareils à proximité dans les paramètres Android pour l’appairage Wi-Fi.", "Wi-FiでペアリングするにはAndroid設定で付近のデバイスを許可してください。", "Wi-Fi 페어링을 위해 Android 설정에서 주변 기기를 허용하세요.")
+    val androidSettings = s("Open Android settings", "Android ayarlarını aç", "Abrir ajustes de Android", "Abrir definições Android", "Ouvrir les paramètres Android", "Android設定を開く", "Android 설정 열기")
+    val loggedTime = s("Logged", "Kaydedilen", "Registrado", "Registado", "Enregistré", "記録", "기록")
+    val themeChoice = s("Theme", "Tema", "Tema", "Tema", "Thème", "テーマ", "테마")
+    val pausesLabel = s("Pauses", "Duraklamalar", "Pausas", "Pausas", "Pauses", "一時停止", "일시정지")
+    val previous = s("Previous period", "Önceki dönem", "Periodo anterior", "Período anterior", "Période précédente", "前の期間", "이전 기간")
+    val next = s("Next period", "Sonraki dönem", "Siguiente periodo", "Próximo período", "Période suivante", "次の期間", "다음 기간")
+    val openTimer = s("Open timer", "Zamanlayıcıyı aç", "Abrir temporizador", "Abrir temporizador", "Ouvrir le minuteur", "タイマーを開く", "타이머 열기")
+    val actions = s("More actions", "Diğer işlemler", "Más acciones", "Mais ações", "Autres actions", "その他の操作", "추가 작업")
+    val focusPlan = s("Focus plan", "Odak planı", "Plan de enfoque", "Plano de foco", "Plan de concentration", "集中プラン", "집중 계획")
+    val nextSitting = s("Changes apply to the next sitting.", "Değişiklikler sonraki oturumda uygulanır.", "Los cambios se aplican a la próxima sesión.", "As alterações aplicam-se à próxima sessão.", "Les modifications s’appliquent à la prochaine séance.", "変更は次のセッションに適用されます。", "변경 사항은 다음 세션에 적용됩니다.")
+    val assignedTags = s("Assigned tags", "Atanan etiketler", "Etiquetas asignadas", "Etiquetas atribuídas", "Étiquettes attribuées", "割り当てたタグ", "지정된 태그")
+    val timerDefaults = s("Timer defaults", "Varsayılan zamanlayıcı", "Valores del temporizador", "Predefinições do temporizador", "Réglages du minuteur", "タイマーの初期設定", "타이머 기본 설정")
+    val storage = s("Storage", "Depolama", "Almacenamiento", "Armazenamento", "Stockage", "ストレージ", "저장 공간")
+    val focusTime = s("Focus time", "Odak süresi", "Tiempo de enfoque", "Tempo de foco", "Temps de concentration", "集中時間", "집중 시간")
+    val sessions = s("Sessions", "Oturumlar", "Sesiones", "Sessões", "Séances", "セッション", "세션")
+    val byProject = s("By project", "Projeye göre", "Por proyecto", "Por projeto", "Par projet", "プロジェクト別", "프로젝트별")
+    val byDay = s("Focus by day", "Günlük odak", "Enfoque por día", "Foco por dia", "Concentration par jour", "日別の集中", "일별 집중")
+    val onlyFocus = s("Only focus and tracking time count toward statistics.", "İstatistiklerde yalnız odak ve takip süresi sayılır.", "Solo el enfoque y el registro cuentan en las estadísticas.", "Só o foco e o registo contam nas estatísticas.", "Seuls la concentration et le suivi comptent dans les statistiques.", "統計には集中と計測の時間だけが含まれます。", "통계에는 집중 및 기록 시간만 포함됩니다.")
+    val localNetwork = s("Local network only. No account required.", "Yalnız yerel ağ. Hesap gerekmez.", "Solo red local. Sin cuenta.", "Apenas rede local. Sem conta.", "Réseau local uniquement. Aucun compte requis.", "ローカルネットワークのみ。アカウント不要。", "로컬 네트워크 전용. 계정이 필요하지 않습니다.")
     val timer = s("Timer", "Zamanlayıcı", "Temporizador", "Temporizador", "Minuteur", "タイマー", "타이머")
     val projects = s("Projects", "Projeler", "Proyectos", "Projetos", "Projets", "プロジェクト", "프로젝트")
     val stats = s("Stats", "İstatistik", "Datos", "Dados", "Stats", "記録", "기록")
@@ -89,17 +111,17 @@ class T(lang: String) {
     val hours = s("Hours", "Saat", "Horas", "Horas", "Heures", "時間", "시간")
     val minutes = s("Minutes", "Dakika", "Minutos", "Minutos", "Minutes", "分", "분")
     val seconds = s("Seconds", "Saniye", "Segundos", "Segundos", "Secondes", "秒", "초")
-    val workTime = s("Work time", "Çalışma süresi", "Tiempo de trabajo", "Tempo de trabalho", "Temps de travail", "作業時間", "작업 시간")
+    val workTime = s("Total work time", "Toplam çalışma süresi", "Tiempo total de trabajo", "Tempo total de trabalho", "Temps de travail total", "合計作業時間", "총 작업 시간")
     val sessionStart = s("Start time", "Başlangıç saati", "Hora de inicio", "Hora de início", "Heure de début", "開始時刻", "시작 시간")
     val recordedOverlap = s("This overlaps time already logged.", "Bu süre kayıtlı süreyle çakışıyor.", "Se solapa con tiempo ya registrado.", "Sobrepõe tempo já registado.", "Cela chevauche du temps déjà enregistré.", "記録済みの時間と重なります。", "이미 기록한 시간과 겹칩니다.")
     val workHelp = s(
-        "The whole project. It is split into equal stretches.",
-        "Projenin tümü. Eşit dilimlere bölünür.",
-        "El proyecto entero. Se reparte en tramos iguales.",
-        "O projeto inteiro. Divide-se em trechos iguais.",
-        "Tout le projet. Il se partage en passages égaux.",
-        "プロジェクト全体。等しい区間に分かれます。",
-        "프로젝트 전체. 같은 길이의 구간으로 나뉩니다.",
+        "Total focus time for one sitting, divided into equal stretches. Breaks are extra.",
+        "Bir oturumun toplam odak süresi eşit dilimlere bölünür. Molalar ayrıdır.",
+        "Tiempo total de enfoque de una sesión, dividido en tramos iguales. Las pausas son adicionales.",
+        "Tempo total de foco de uma sessão, dividido em trechos iguais. As pausas são adicionais.",
+        "Temps de concentration total d’une séance, réparti en périodes égales. Les pauses s’ajoutent.",
+        "1回の合計集中時間を均等に分けます。休憩時間は別です。",
+        "한 세션의 총 집중 시간을 같은 길이로 나눕니다. 휴식 시간은 별도입니다.",
     )
     val shortBreaks = s("Short breaks", "Kısa molalar", "Descansos cortos", "Pausas curtas", "Pauses courtes", "小休止", "짧은 쉼")
     val longBreaks = s("Long breaks", "Uzun molalar", "Descansos largos", "Pausas longas", "Pauses longues", "長休止", "긴 쉼")

@@ -197,10 +197,7 @@ class Repo(private val context: Context) : Catalog {
                 )
             }
             val writer = deviceIdLocked()
-            val staleGroups = dao.all().filter { it.kind == KIND_GROUP && !it.deleted }
-            if (staleGroups.isNotEmpty()) {
-                dao.upsert(staleGroups.map { it.copy(deleted = true, updatedAt = now) })
-            }
+            // Preserve historical group records when opening an existing database.
             val have = dao.all().filter { it.kind == KIND_PREF }.map { it.id }.toSet()
             val defaults = mapOf(
                 "focus_min" to "25",

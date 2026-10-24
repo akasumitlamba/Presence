@@ -18,7 +18,7 @@ The APK is signed and can be installed without Play Store billing.
 Everything in Presence is free. There is no premium tier and no tester switch.
 
 - Work time split into equal stretches, with short and long breaks between them
-- Play, pause, and stop
+- Play, pause, resume, stop, and skip, plus free tracking, count-up display, and optional auto-continue
 - Projects, tasks, and tags. A project is a name, and it can be deleted
 - A todo list: add, complete, and delete
 - A project goal and the daily target that shrinks as you log time
@@ -44,9 +44,9 @@ Source Sans 3 is bundled for the app and the widgets. Its license is in `third_p
 
 Work time is one project duration. The default is one hour. Stretch count is the short-break count plus the long-break count plus one, and each stretch is that duration divided evenly. One hour with two short breaks is three 20-minute stretches. A different duration splits the same way.
 
-Breaks start when a stretch ends. The next stretch waits until Play. Stop ends the sitting, including one that is waiting after a break. Pauses are not work and are not written into stats. The circle is split into one arc per stretch, and the center shows the time left in the current phase.
+Breaks start when a stretch ends. The next stretch waits until Play unless auto-continue is enabled. Stop ends the sitting, including one that is waiting after a break. Pauses are not work and are not written into stats. The ring shows progress through the current phase, with markers and a computed count for the sitting’s focus stretches. Countdown and count-up displays share the same deadline; free tracking has no automatic deadline.
 
-Settings changes apply to the next sitting. An open sitting keeps its lengths and its project. Only focus counts toward goals and statistics. A late alarm does not add the delay as work or as a pause.
+Settings changes apply to the next sitting. An open sitting keeps its lengths and its project. Only focus and tracking count toward goals and statistics. A late alarm does not add the delay as work or as a pause.
 
 ## Pair two phones
 
@@ -76,9 +76,15 @@ Install JDK 17 or newer and Android SDK 35 (platform and build-tools 35). Point 
 
 The installable APK is `app/build/outputs/apk/debug/app-debug.apk`. `assembleRelease` uses the same debug signature so it is installable too.
 
-## Layout
+## Layout and appearance
 
-A narrow window keeps a bottom bar and one column. A landscape phone, a tablet, or any other wide window uses a navigation rail, a project list beside its detail, the timer ring beside its controls, and stats in a grid.
+The interface responds to available width and height after system bars and cutouts. Portrait phones use bottom navigation; short landscape phones use a compact rail and scrollable single-pane forms. Wide tablets use a rail, project master-detail, and bounded chart/settings grids. Todos use one bounded list at every size. Drafts and navigation survive resize and rotation.
+
+System insets are owned by the root; keyboard avoidance belongs to the content. Text preferences change typography rather than dp density and retain Android font scaling. Duration editors retain hours, minutes and seconds. Work stretch count is computed from the break counts and is never independently editable.
+
+All eleven palettes remain available: Grove, Harbor, Dusk, Slate, Berry, Amber, Moss, Iris, Copper, Tide and Ink. Every palette supports Light, Dark and Follow system. Appearance, palettes and language remain device-local preferences.
+
+Statistics use calendar days, Monday-first weeks, calendar months and years. The weekly overview has an explicit date label. Zero activity displays zero totals, no positive bars and an unfilled data ring. Manual sessions have real date/time pickers and reject future or overlapping work.
 
 ## Languages
 

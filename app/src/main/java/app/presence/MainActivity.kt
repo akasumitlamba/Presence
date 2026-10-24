@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestedTab = intent?.getStringExtra(EXTRA_TAB)
+        requestedTab = if (savedInstanceState == null) intent?.getStringExtra(EXTRA_TAB) else null
         enableEdgeToEdge()
         setContent { PresenceRoot() }
     }
