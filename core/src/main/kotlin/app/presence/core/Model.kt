@@ -13,7 +13,7 @@ const val KIND_LOCAL = "local"
 val SYNC_KINDS = setOf(KIND_GROUP, KIND_TAG, KIND_PROJECT, KIND_TASK, KIND_SESSION, KIND_PREF)
 
 val TIMER_PREF_IDS = setOf(
-    "focus_min", "short_min", "long_min", "cycles", "count_up",
+    "focus_min", "short_min", "long_min", "cycles", "count_up", "auto_start",
     "work_sec", "short_sec", "long_sec", "short_count", "long_count",
 )
 

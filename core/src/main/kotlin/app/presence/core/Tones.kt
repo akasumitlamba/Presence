@@ -43,7 +43,7 @@ object Tones {
         val out = ShortArray(frames)
         for (i in out.indices) {
             state = (1664525L * state + 1013904223L) and 0xffffffffL
-            val white = ((state.toInt() shr 16) / 32768.0) - 1.0
+            val white = ((state ushr 16) / 32767.5) - 1.0
             hold += (white - hold) * cutoff
             val sample = (hold * 0.35).coerceIn(-1.0, 1.0)
             out[i] = (sample * Short.MAX_VALUE).toInt().toShort()

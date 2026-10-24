@@ -15,6 +15,7 @@ class Player(private val context: Context) {
     private var alarm: AudioTrack? = null
     private var media: MediaPlayer? = null
 
+    @Synchronized
     fun stopLoop() {
         loop?.let { track ->
             try {
@@ -28,6 +29,7 @@ class Player(private val context: Context) {
         loopKind = null
     }
 
+    @Synchronized
     fun loop(kind: String, volume: Float) {
         if (kind == "off") {
             stopLoop()
@@ -51,6 +53,7 @@ class Player(private val context: Context) {
         loopKind = kind
     }
 
+    @Synchronized
     fun alarm(kind: String) {
         alarm?.release()
         alarm = null
@@ -67,7 +70,11 @@ class Player(private val context: Context) {
                         .build(),
                 )
                 player.setDataSource(custom.absolutePath)
-                player.setOnCompletionListener { it.release() }
+                player.setOnCompletionListener {
+                    synchronized(this) {
+                        if (media === it) { media = null; it.release() }
+                    }
+                }
                 player.prepare()
                 player.start()
                 media = player

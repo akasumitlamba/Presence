@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -57,7 +58,7 @@ class TimerService : Service() {
                 DISMISS -> app.notifier.cancelDone()
                 DUE -> app.center.due(intent.getStringExtra(EXTRA_TOKEN))
                 CATCHUP -> app.center.catchUp()
-                else -> Unit
+                else -> if (intent == null) app.center.catchUp()
             }
             val snap = app.center.snap()
             if (snap.status == "running" || snap.status == "paused") {
@@ -65,7 +66,7 @@ class TimerService : Service() {
                 startTick()
             } else {
                 tick?.cancel()
-                ServiceCompat.stopForeground(this@TimerService, ServiceCompat.STOP_FOREGROUND_DETACH)
+                ServiceCompat.stopForeground(this@TimerService, ServiceCompat.STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }
@@ -81,7 +82,7 @@ class TimerService : Service() {
                 app.ready.await()
                 val before = app.center.snap()
                 if (before.status != "running" && before.status != "paused") {
-                    ServiceCompat.stopForeground(this@TimerService, ServiceCompat.STOP_FOREGROUND_DETACH)
+                    ServiceCompat.stopForeground(this@TimerService, ServiceCompat.STOP_FOREGROUND_REMOVE)
                     stopSelf()
                     break
                 }
@@ -100,7 +101,7 @@ class TimerService : Service() {
     }
 
     override fun onDestroy() {
-        tick?.cancel()
+        scope.cancel()
         super.onDestroy()
     }
 
@@ -145,8 +146,9 @@ fun PresenceApp.reactTo(step: Step) {
             TimerService.ensure(this)
         } catch (_: Exception) {
         }
-    } else if (step.chime && step.snap.status == "awaiting") {
-        notifier.finished(step.snap)
+    } else {
+        notifier.cancelOngoing()
+        if (step.chime) notifier.finished(step.snap) else notifier.cancelDone()
     }
     HomeWidgets.update(this)
 }

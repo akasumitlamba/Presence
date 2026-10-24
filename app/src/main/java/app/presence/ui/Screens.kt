@@ -102,6 +102,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
@@ -131,11 +133,13 @@ import app.presence.core.dailyTargetMinutes
 import app.presence.core.dayKey
 import app.presence.core.dayTotals
 import app.presence.core.decodeBackup
+import app.presence.core.elapsedWork
 import app.presence.core.displayMillis
 import app.presence.core.encodeBackup
 import app.presence.core.f
 import app.presence.core.freeProjectIds
 import app.presence.core.manualSession
+import app.presence.core.overlapsClosed
 import app.presence.core.overlapsOpen
 import app.presence.core.pauseNoteMillis
 import app.presence.core.sessionOpen
@@ -159,6 +163,8 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -355,6 +361,9 @@ private fun TimerPage(
     val project = projects.find { it.id == selected }
     val tasks = rows.alive(KIND_TASK).filter { it.f("projectId") == project?.id && it.f("done") != "1" }
     val task = tasks.find { it.id == taskId }
+    LaunchedEffect(snap.projectId, snap.taskId) {
+        if (sessionOpen(snap)) { selected = snap.projectId; taskId = snap.taskId }
+    }
     val globals = app.repo.globals()
     val open = sessionOpen(snap)
     val planWork = if (open) snap.workMillis else project?.f("workSec")?.toLongOrNull()?.times(1_000L) ?: globals.workMillis
@@ -366,10 +375,11 @@ private fun TimerPage(
         snap.status == "idle" || snap.status == "awaiting" -> t.focus
         else -> phase(t, snap.kind)
     }
-    val face = if (snap.status == "idle") lengths.first() else shown
+    val face = if (snap.status == "idle") { if (globals.countUp) 0L else lengths.first() } else shown
+    val phaseWorked = elapsedWork(snap, System.currentTimeMillis(), SystemClock.elapsedRealtime())
     val loggedId = if (open) snap.projectId else project?.id
     val logged = if (loggedId == null) 0L else workedMillisFor(rows, loggedId)
-    val liveWork = if (open && snap.kind == "focus" && snap.phaseMillis > 0L) (snap.phaseMillis - shown).coerceAtLeast(0L) else 0L
+    val liveWork = if (open && snap.kind in setOf("focus", "track")) phaseWorked else 0L
     val spent = logged + liveWork
     val notificationsOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
     val controls: @Composable () -> Unit = {
@@ -384,7 +394,7 @@ private fun TimerPage(
                     modifier = Modifier.fillMaxWidth(),
                     colors = presenceFieldColors(),
                 )
-                Box(Modifier.matchParentSize().clickable { projectMenu = true })
+                Box(Modifier.matchParentSize().semantics { contentDescription = t.projects }.clickable { projectMenu = true })
                 DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
                     projects.forEach { item ->
                         val locked = !premium && item.id !in free
@@ -393,8 +403,10 @@ private fun TimerPage(
                             onClick = {
                                 projectMenu = false
                                 if (locked) onGate() else {
-                                    selected = item.id
-                                    taskId = null
+                                    if (open && item.id != snap.projectId) pending = item else {
+                                        selected = item.id
+                                        taskId = null
+                                    }
                                 }
                             },
                         )
@@ -411,7 +423,7 @@ private fun TimerPage(
             if (tasks.isNotEmpty()) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     tasks.forEach { item ->
-                        PresenceChip(selected = item.id == taskId, onClick = { taskId = if (taskId == item.id) null else item.id }, label = { Text(item.f("title")) })
+                        PresenceChip(selected = item.id == taskId, onClick = { if (!open) taskId = if (taskId == item.id) null else item.id }, label = { Text(item.f("title")) })
                     }
                 }
             }
@@ -439,18 +451,27 @@ private fun TimerPage(
                     TonalButton(onClick = { app.center.stop() }, modifier = stopMod) { Text(t.stop) }
                 }
             }
+            if (!open && canBegin) {
+                TonalButton(onClick = { app.center.start("track", project, task) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(t.trackTime)
+                }
+            }
+            if (snap.status == "running" || snap.status == "paused") {
+                if (snap.kind != "track") TextButton(onClick = { app.center.skip() }) { Text(t.skip) }
+            }
             if (snap.status == "awaiting") Text(t.waiting)
+            if (!canBegin && !open) TonalButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) { Text(t.newProject) }
             if (!notificationsOn) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
         }
     }
     val ring = @Composable {
         Box(Modifier.size(280.dp), contentAlignment = Alignment.Center) {
             val color = MaterialTheme.colorScheme.primary
-            val track = MaterialTheme.colorScheme.outline
+            val track = MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
             val dot = MaterialTheme.colorScheme.onSurface
             Canvas(Modifier.fillMaxSize().padding(12.dp)) {
-                val gapDeg = 16f
-                val sweep = ((360f - gapDeg * stretches) / stretches).coerceAtLeast(8f)
+                val gapDeg = minOf(16f, 120f / stretches)
+                val sweep = (360f - gapDeg * stretches) / stretches
                 val stroke = Stroke(22f, cap = StrokeCap.Round)
                 val onStretch = snap.kind == "focus" && (snap.status == "running" || snap.status == "paused")
                 val doneCount = when {
@@ -459,7 +480,7 @@ private fun TimerPage(
                     else -> snap.stretchIndex.coerceIn(0, stretches)
                 }
                 val partial = if (onStretch && snap.phaseMillis > 0L) {
-                    (1f - shown.toFloat() / snap.phaseMillis.toFloat()).coerceIn(0f, 1f)
+                    (phaseWorked.toFloat() / snap.phaseMillis.toFloat()).coerceIn(0f, 1f)
                 } else {
                     0f
                 }
@@ -489,8 +510,9 @@ private fun TimerPage(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(label, style = MaterialTheme.typography.titleMedium)
+                if (open && snap.kind != "track") Text(t.cycleLine((snap.stretchIndex + 1).coerceAtMost(stretches), stretches), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(clockDigits(face), style = MaterialTheme.typography.displayLarge)
-                Text(clockDigits(spent), style = MaterialTheme.typography.titleMedium)
+                Text("${t.loggedTime} · ${clockDigits(spent)}", style = MaterialTheme.typography.titleMedium)
             }
         }
     }
@@ -523,6 +545,8 @@ private fun TimerPage(
     if (pending != null) {
         Confirm(t.switchTitle, t.switchBody, t.save, t.cancel, {
             val next = pending
+            selected = next?.id
+            taskId = null
             pending = null
             app.center.stop()
             if (next != null) app.center.start("focus", next, null)
@@ -734,6 +758,8 @@ private fun ProjectDetail(
     var newTask by remember { mutableStateOf(false) }
     var goalOpen by remember { mutableStateOf(false) }
     var deleteTask by remember { mutableStateOf<Rec?>(null) }
+    var editTask by remember { mutableStateOf<Rec?>(null) }
+    var newGroup by remember { mutableStateOf(false) }
     var newTag by remember { mutableStateOf(false) }
     var editTag by remember { mutableStateOf<Rec?>(null) }
     var name by remember(project.id) { mutableStateOf(project.f("name")) }
@@ -757,6 +783,12 @@ private fun ProjectDetail(
             modifier = Modifier.fillMaxWidth(),
             colors = presenceFieldColors(),
         )
+        val groups = rows.alive(KIND_GROUP)
+        MenuField(t.groups, t.groups, groups.find { it.id == project.f("groupId") }?.f("name") ?: t.noGroup,
+            listOf("" to t.noGroup) + groups.map { it.id to it.f("name") }) { groupId ->
+            app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = project.body + ("groupId" to groupId)))
+        }
+        TextButton(onClick = { newGroup = true }) { Text(t.newGroup) }
         Text(t.goal, style = MaterialTheme.typography.titleLarge)
         val goalMinutes = project.f("goalMinutes").toIntOrNull()
         val deadline = project.f("goalDeadline").toLongOrNull()
@@ -788,9 +820,10 @@ private fun ProjectDetail(
             TextButton(onClick = onGate) { Text(t.locked) }
         } else {
             ProjectPlanFields(t, project, globals) { key, value ->
-                val body = project.body.toMutableMap()
+                val latest = app.repo.snapshot().find { it.kind == KIND_PROJECT && it.id == project.id } ?: project
+                val body = latest.body.toMutableMap()
                 body[key] = value
-                app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
+                app.repo.put(latest.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
                 app.center.refreshSettings()
             }
         }
@@ -839,7 +872,7 @@ private fun ProjectDetail(
                         app.repo.put(task.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
                     }
                 })
-                Text(task.f("title") + if (locked) " · " + t.locked else "", modifier = Modifier.weight(1f))
+                Text(task.f("title") + if (locked) " · " + t.locked else "", modifier = Modifier.weight(1f).clickable { editTask = task })
                 TextButton(onClick = { deleteTask = task }) { Text(t.delete) }
             }
         }
@@ -858,6 +891,38 @@ private fun ProjectDetail(
             app.repo.put(tag.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
             editTag = null
         }
+    }
+    if (newGroup) {
+        NameDialog(t.newGroup, "", t, { newGroup = false }) { title ->
+            app.repo.put(app.repo.writerNow(KIND_GROUP, UUID.randomUUID().toString(), mapOf("name" to title)))
+            newGroup = false
+        }
+    }
+    editTask?.let { item ->
+        var title by remember(item.id) { mutableStateOf(item.f("title")) }
+        var picked by remember(item.id) { mutableStateOf(item.f("tags").split(",").filter { it.isNotBlank() }.toSet()) }
+        AlertDialog(
+            onDismissRequest = { editTask = null },
+            title = { Text(t.tasks) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(title, { title = it }, label = { Text(t.name) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        tags.forEach { tag ->
+                            PresenceChip(selected = tag.id in picked, onClick = {
+                                picked = if (tag.id in picked) picked - tag.id else picked + tag.id
+                            }, label = { Text(tag.f("name")) })
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
+                val latest = app.repo.snapshot().find { it.kind == KIND_TASK && it.id == item.id } ?: item
+                app.repo.put(latest.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = latest.body + mapOf("title" to title.trim(), "tags" to picked.joinToString(","))))
+                editTask = null
+            }) { Text(t.save) } },
+            dismissButton = { TextButton(onClick = { editTask = null }) { Text(t.cancel) } },
+        )
     }
     if (newTask) {
         NameDialog(t.newTask, "", t, { newTask = false }) { title ->
@@ -908,6 +973,13 @@ private fun PlanSections(
 ) {
     val lengths = stretchLengths(workSec.coerceAtLeast(1L) * 1_000L, stretchCount(shortCount, longCount))
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        TonalButton(onClick = {
+            onWork(100 * 60L)
+            onShortCount(3)
+            onLongCount(0)
+            onShort(5 * 60L)
+            onLong(15 * 60L)
+        }, modifier = Modifier.fillMaxWidth()) { Text(t.pomodoroPreset) }
         FieldSection(t.workTime, t.workHelp) {
             HmsFields(t, workSec, onWork)
             Text(t.stretchSummary(stretchCount(shortCount, longCount), clockDigits(lengths.first())), color = MaterialTheme.colorScheme.onSurface)
@@ -949,15 +1021,15 @@ private fun HmsFields(t: T, totalSec: Long, onSec: (Long) -> Unit) {
     var minutes by remember(totalSec) { mutableStateOf(parts.second.toString()) }
     var seconds by remember(totalSec) { mutableStateOf(parts.third.toString()) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        UnitBox(t.hours, hours) {
+        UnitBox(t.hours, hours, Modifier.weight(1f)) {
             hours = it
             onSec(joinSeconds(it, minutes, seconds))
         }
-        UnitBox(t.minutes, minutes) {
+        UnitBox(t.minutes, minutes, Modifier.weight(1f)) {
             minutes = it
             onSec(joinSeconds(hours, it, seconds))
         }
-        UnitBox(t.seconds, seconds) {
+        UnitBox(t.seconds, seconds, Modifier.weight(1f)) {
             seconds = it
             onSec(joinSeconds(hours, minutes, it))
         }
@@ -965,14 +1037,14 @@ private fun HmsFields(t: T, totalSec: Long, onSec: (Long) -> Unit) {
 }
 
 @Composable
-private fun UnitBox(label: String, value: String, onValue: (String) -> Unit) {
+private fun UnitBox(label: String, value: String, modifier: Modifier, onValue: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = { raw -> onValue(raw.filter { it.isDigit() }.take(2)) },
         label = { Text(label) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.width(104.dp),
+        modifier = modifier,
         colors = presenceFieldColors(),
     )
 }
@@ -1204,7 +1276,7 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
     }
     if (manual) ManualDialog(t, rows, selectedDay, dayStart, snap, { manual = false }) { message ->
         note = message
-        manual = false
+        if (message.isEmpty()) manual = false
     }
 }
 
@@ -1242,7 +1314,7 @@ private fun CalendarBlock(
         }
         val marked = rows.alive(KIND_SESSION).mapNotNull {
             val start = it.f("startedAt").toLongOrNull() ?: return@mapNotNull null
-            if (it.f("endedAt").isEmpty()) null else dayKey(start, zone, dayStart)
+            if (sessionCountedMillis(it) <= 0) null else dayKey(start, zone, dayStart)
         }.toSet()
         Column {
             for (week in 0 until 6) {
@@ -1274,22 +1346,30 @@ private fun CalendarBlock(
 
 @Composable
 private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, snap: Snap, onClose: () -> Unit, onDone: (String) -> Unit) {
-    val app = LocalContext.current.applicationContext as PresenceApp
+    val context = LocalContext.current
+    val app = context.applicationContext as PresenceApp
     val projects = rows.alive(KIND_PROJECT)
+    var startHour by remember { mutableIntStateOf(dayStart) }
+    var startMinute by remember { mutableIntStateOf(0) }
     var project by remember { mutableStateOf(projects.firstOrNull()?.id.orEmpty()) }
     var hours by remember { mutableIntStateOf(0) }
     var mins by remember { mutableIntStateOf(25) }
     var kind by remember { mutableStateOf("focus") }
+    var error by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onClose,
         title = { Text(t.manual) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 projects.forEach { item ->
                     PresenceChip(selected = project == item.id, onClick = { project = item.id }, label = { Text(item.f("name")) })
                 }
+                TextButton(onClick = {
+                    TimePickerDialog(context, { _, h, m -> startHour = h; startMinute = m }, startHour, startMinute, true).show()
+                }) { Text("${t.sessionStart}: ${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}") }
                 CountStepper(t, t.hours, hours, 0, 12) { hours = it }
                 CountStepper(t, t.minutes, mins, 0, 59) { mins = it }
+                if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
                 Row {
                     PresenceChip(selected = kind == "focus", onClick = { kind = "focus" }, label = { Text(t.focus) })
                     Spacer(Modifier.width(8.dp))
@@ -1301,10 +1381,13 @@ private fun ManualDialog(t: T, rows: List<Rec>, day: LocalDate, dayStart: Int, s
             TextButton(onClick = {
                 val duration = (hours * 60L + mins) * 60_000L
                 val zone = ZoneId.systemDefault()
-                val start = day.atTime(dayStart.coerceAtLeast(0), 30).atZone(zone).toInstant().toEpochMilli()
+                val calendarDay = if (startHour < dayStart) day.plusDays(1) else day
+                val start = calendarDay.atTime(startHour, startMinute).atZone(zone).toInstant().toEpochMilli()
                 when {
-                    duration < 60_000L -> onDone(t.atLeast)
-                    overlapsOpen(snap, start, duration, System.currentTimeMillis()) -> onDone(t.overlap)
+                    duration < 60_000L -> run { error = t.atLeast }
+                    start + duration > System.currentTimeMillis() -> run { error = t.future }
+                    overlapsClosed(rows, start, duration) -> run { error = t.recordedOverlap }
+                    overlapsOpen(snap, start, duration, System.currentTimeMillis()) -> run { error = t.overlap }
                     else -> {
                 val chosen = projects.find { it.id == project }
                 val group = rows.alive(KIND_GROUP).find { it.id == chosen?.f("groupId") }?.f("name").orEmpty()
@@ -1451,25 +1534,32 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
     val globals = app.repo.globals()
     val flags = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.body.orEmpty()
     var note by remember { mutableStateOf("") }
+    fun fileOperation(block: () -> Unit) {
+        scope.launch {
+            try { withContext(Dispatchers.IO) { block() } }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { note = t.fileError }
+        }
+    }
     val exportJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
+        fileOperation {
             val text = encodeBackup(app.repo.snapshot().filter { it.kind in SYNC_KINDS })
-            context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
+            (context.contentResolver.openOutputStream(uri) ?: throw java.io.IOException("Cannot write file")).use { it.write(text.toByteArray()) }
         }
     }
     val exportCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
+        fileOperation {
             val text = sessionsCsv(app.repo.snapshot(), ZoneId.systemDefault(), app.repo.globals().dayStart)
-            context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
+            (context.contentResolver.openOutputStream(uri) ?: throw java.io.IOException("Cannot write file")).use { it.write(text.toByteArray()) }
         }
     }
     val importJson = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
-            val parsed = text?.let { decodeBackup(it) }
+        fileOperation {
+            val text = (context.contentResolver.openInputStream(uri) ?: throw java.io.IOException("Cannot read file")).bufferedReader().use { it.readText() }
+            val parsed = decodeBackup(text)
             if (parsed == null) note = t.badFile else {
                 app.repo.mergeFrom(parsed)
                 note = t.imported
@@ -1478,11 +1568,18 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
     }
     val sound = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                java.io.File(AppStorage.privateDir(context), "alarm-custom").outputStream().use { output -> input.copyTo(output) }
-            }
-            app.repo.setPref("alarm", "custom")
+        fileOperation {
+            val directory = AppStorage.privateDir(context)
+            val pending = java.io.File(directory, "alarm-custom.pending")
+            try {
+                (context.contentResolver.openInputStream(uri) ?: throw java.io.IOException("Cannot read sound")).use { input ->
+                    pending.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (pending.length() == 0L || !pending.renameTo(java.io.File(directory, "alarm-custom"))) {
+                    throw java.io.IOException("Cannot save sound")
+                }
+                app.repo.setPref("alarm", "custom")
+            } finally { pending.delete() }
         }
     }
     val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -1551,6 +1648,14 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             onShort = { app.repo.setPref("short_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
             onLong = { app.repo.setPref("long_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
         )
+        SwitchSetting(t.countUp, t.countUpHelp, globals.countUp) {
+            app.repo.setPref("count_up", if (it) "1" else "0")
+            app.center.refreshSettings()
+        }
+        SwitchSetting(t.autoContinue, t.autoHelp, globals.auto) {
+            app.repo.setPref("auto_start", if (it) "1" else "0")
+            app.center.refreshSettings()
+        }
         Stepper(t, t.dayStarts, t.dayHelp, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
         Text(t.reminders, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         ReminderRow(t.dailyReminder, t.dailyHelp, globals.dailyOn, globals.dailyHour, globals.dailyMinute, { on ->
@@ -1644,8 +1749,9 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
         }
         MenuField(t.background, t.backgroundMenuHelp, backgroundLabel, listOf("off" to t.off, "rain" to t.rain, "brook" to t.brook, "hearth" to t.hearth)) {
             app.repo.setPref("background", it)
+            app.center.catchUp()
         }
-        Stepper(t, t.volume, t.volumeHelp, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()) }
+        Stepper(t, t.volume, t.volumeHelp, globals.volume, 0, 100) { app.repo.setPref("bg_volume", it.toString()); app.center.catchUp() }
         Text(t.data, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         Setting(t.exportJson, t.exportJsonHelp) {
             PresenceButton(onClick = { exportJson.launch("presence-backup.json") }) { Text(t.exportJson) }
@@ -1738,7 +1844,7 @@ private fun MenuField(
                 modifier = Modifier.fillMaxWidth(),
                 colors = presenceFieldColors(),
             )
-            Box(Modifier.matchParentSize().clickable { open = true })
+            Box(Modifier.matchParentSize().semantics { contentDescription = title }.clickable { open = true })
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 options.forEach { (id, label) ->
                     DropdownMenuItem(text = { Text(label) }, onClick = { open = false; onPick(id) })
@@ -1775,24 +1881,24 @@ private fun SwitchSetting(title: String, help: String, checked: Boolean, onCheck
 @Composable
 private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
     val context = LocalContext.current
+    if (!app.hasLan()) {
+        Text(t.pairMessage("dropped"), modifier = Modifier.padding(16.dp))
+        return
+    }
     val offer by app.lan.offer.collectAsState()
     val until by app.lan.offerUntil.collectAsState()
     val message by app.lan.message.collectAsState()
     var digits by remember { mutableStateOf("") }
     var now by remember { mutableIntStateOf(0) }
     var afterGrant by remember { mutableStateOf<(() -> Unit)?>(null) }
-    val nearbyPermission = if (Build.VERSION.SDK_INT >= 33) {
-        Manifest.permission.NEARBY_WIFI_DEVICES
-    } else {
-        Manifest.permission.ACCESS_FINE_LOCATION
-    }
+    val nearbyPermission = Manifest.permission.NEARBY_WIFI_DEVICES
     val askNearby = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val next = afterGrant
         afterGrant = null
         if (granted) next?.invoke()
     }
     val withLink: (() -> Unit) -> Unit = { block ->
-        val granted = ContextCompat.checkSelfPermission(context, nearbyPermission) == PackageManager.PERMISSION_GRANTED
+        val granted = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, nearbyPermission) == PackageManager.PERMISSION_GRANTED
         if (granted) block() else {
             afterGrant = block
             askNearby.launch(nearbyPermission)
@@ -1821,10 +1927,10 @@ private fun PairPage(app: PresenceApp, t: T, rows: List<Rec>) {
             PresenceButton(onClick = { withLink { app.lan.showCode() } }) { Text(t.newCode) }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(digits, { if (it.length <= 4 && it.all { ch -> ch.isDigit() }) digits = it }, label = { Text(t.enterCode) }, modifier = Modifier.weight(1f), colors = presenceFieldColors())
+            OutlinedTextField(digits, { if (it.length <= 4 && it.all { ch -> ch in '0'..'9' }) digits = it }, label = { Text(t.enterCode) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.weight(1f), colors = presenceFieldColors())
             Explain(t.enterHelp)
         }
-        PresenceButton(onClick = { withLink { app.lan.enter(digits) } }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pairAction) }
+        PresenceButton(onClick = { withLink { app.lan.enter(digits) } }, enabled = digits.length == 4 && message != "syncing", modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(t.pairAction) }
         if (message.isNotEmpty() && message != "expired") Text(t.pairMessage(message))
         Text(t.devices, style = MaterialTheme.typography.titleLarge)
         if (peers.isEmpty()) Text(t.noPeers)

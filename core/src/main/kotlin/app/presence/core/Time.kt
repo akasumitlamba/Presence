@@ -309,12 +309,13 @@ fun elapsedWork(snap: Snap, nowEpoch: Long, nowElapsed: Long): Long {
     val byElapsed = nowElapsed - snap.stretchElapsed
     val useEpoch = skewLarge(nowEpoch, nowElapsed, snap.stretchEpoch, snap.stretchElapsed)
     val stretch = (if (useEpoch) byEpoch else byElapsed).coerceAtLeast(0)
-    return snap.workedMs + stretch
+    val worked = snap.workedMs + stretch
+    return if (snap.kind == "track") worked else worked.coerceAtMost(snap.phaseMillis)
 }
 
 fun displayMillis(snap: Snap, nowEpoch: Long, nowElapsed: Long): Long {
     if (snap.kind == "track") return elapsedWork(snap, nowEpoch, nowElapsed)
-    return timeLeft(snap, nowEpoch, nowElapsed)
+    return if (snap.countUp) elapsedWork(snap, nowEpoch, nowElapsed) else timeLeft(snap, nowEpoch, nowElapsed)
 }
 
 fun pauseNoteMillis(snap: Snap, nowEpoch: Long): Long {
@@ -463,7 +464,15 @@ fun arm(
 
 private fun closeOf(snap: Snap, nowEpoch: Long, nowElapsed: Long, keep: Boolean): Rec {
     val worked = elapsedWork(snap, nowEpoch, nowElapsed)
-    val paused = (nowEpoch - snap.sessionStartedEpoch - worked).coerceAtLeast(0)
+    // A late alarm must not log the delay as work or as a pause.
+    val overtime = if (snap.status == "running" && snap.kind != "track") {
+        val gap = if (skewLarge(nowEpoch, nowElapsed, snap.stretchEpoch, snap.stretchElapsed)) {
+            nowEpoch - snap.stretchEpoch
+        } else nowElapsed - snap.stretchElapsed
+        (snap.workedMs + gap.coerceAtLeast(0) - snap.phaseMillis).coerceAtLeast(0)
+    } else 0L
+    val endedAt = nowEpoch - overtime
+    val paused = (endedAt - snap.sessionStartedEpoch - worked).coerceAtLeast(0)
     val hint = StartHint(
         snap.projectId,
         snap.projectName,
@@ -480,7 +489,7 @@ private fun closeOf(snap: Snap, nowEpoch: Long, nowElapsed: Long, keep: Boolean)
         hint,
         nowEpoch,
         snap.kind,
-        endedAt = nowEpoch.toString(),
+        endedAt = endedAt.toString(),
         pausedMs = paused,
         deleted = !keep,
     )
@@ -538,6 +547,7 @@ fun finishSnap(
     nextSessionId: String,
     nextToken: String,
 ): Step {
+    if (mode == "stop" && snap.status == "awaiting") return Step(idleSnap(snap), emptyList(), false, false)
     if (snap.status != "running" && snap.status != "paused") return Step(snap, emptyList(), false, false)
     if (snap.sessionId == null) return Step(snap, emptyList(), false, false)
     val worked = elapsedWork(snap, nowEpoch, nowElapsed)
@@ -583,6 +593,10 @@ fun finishSnap(
             sessionStartedEpoch = 0,
             pauseStartedEpoch = 0,
         )
+        if (snap.autoStart && mode == "due") {
+            val armed = arm(waiting, "focus", nowEpoch, nowElapsed, hintOf(snap, nextSessionId, nextToken))
+            return Step(armed.snap, listOf(closed) + armed.writes, alarm = true, chime = chime)
+        }
         return Step(waiting, listOf(closed), alarm = false, chime = chime)
     }
     return Step(idleSnap(snap), listOf(closed), alarm = false, chime = false)
@@ -769,3 +783,13 @@ fun premiumGate(feature: String, premium: Boolean): Boolean = premium || feature
 val FREE_FEATURES = setOf(
     "timer", "track", "today", "groups", "notify", "widget-today", "sync", "theme", "language",
 )
+
+fun overlapsClosed(records: List<Rec>, startedAt: Long, durationMs: Long): Boolean {
+    val end = startedAt + durationMs
+    return records.any { rec ->
+        if (sessionCountedMillis(rec) <= 0) return@any false
+        val start = rec.f("startedAt").toLongOrNull() ?: return@any false
+        val finish = rec.f("endedAt").toLongOrNull() ?: return@any false
+        startedAt < finish && end > start
+    }
+}

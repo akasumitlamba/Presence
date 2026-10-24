@@ -17,7 +17,6 @@ import app.presence.core.KIND_LOCAL
 import app.presence.core.KIND_PREF
 import app.presence.core.Rec
 import app.presence.core.Snap
-import app.presence.core.TIMER_PREF_IDS
 import app.presence.core.f
 import app.presence.core.mergeRecords
 import app.presence.core.snapFrom
@@ -165,6 +164,8 @@ class Repo(private val context: Context) : Catalog {
                 "long_sec" to "900",
                 "short_count" to "2",
                 "long_count" to "0",
+                "count_up" to "0",
+                "auto_start" to "0",
                 "day_start" to "0",
                 "daily_hour" to "9",
                 "daily_minute" to "0",
@@ -196,9 +197,12 @@ class Repo(private val context: Context) : Catalog {
                 )
             }
             val writer = deviceIdLocked()
-            val staleGroups = dao.all().filter { it.kind == KIND_GROUP && !it.deleted }
-            if (staleGroups.isNotEmpty()) {
-                dao.upsert(staleGroups.map { it.copy(deleted = true, updatedAt = now) })
+            if (rows.none { it.kind == KIND_GROUP }) {
+                dao.upsert(listOf(
+                    app.presence.core.GROUP_WORK to "Work",
+                    app.presence.core.GROUP_STUDY to "Study",
+                    app.presence.core.GROUP_PERSONAL to "Personal",
+                ).map { (id, name) -> Rec(KIND_GROUP, id, now, writer, false, mapOf("name" to name)).toEntity() })
             }
             val have = dao.all().filter { it.kind == KIND_PREF }.map { it.id }.toSet()
             val defaults = mapOf(
@@ -334,7 +338,7 @@ class Repo(private val context: Context) : Catalog {
                 local,
                 incoming,
                 if (busy) setOfNotNull(snap.sessionId) else emptySet(),
-                if (busy) TIMER_PREF_IDS else emptySet(),
+                emptySet(),
             )
             val alarm = merged.find { it.kind == KIND_PREF && it.id == "alarm" }
             if (alarm?.f("value") == "custom" && !File(AppStorage.privateDir(context), "alarm-custom").exists()) {

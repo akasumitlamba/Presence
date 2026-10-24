@@ -60,7 +60,7 @@ class Notifier(private val context: Context) {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-        if (snap.status == "running" && snap.kind != "track") {
+        if (snap.status == "running" && snap.kind != "track" && !snap.countUp) {
             builder.setWhen(snap.alarmAtEpoch)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(true)
@@ -86,7 +86,7 @@ class Notifier(private val context: Context) {
     fun finished(snap: Snap) {
         val t = T(language())
         val phase = phaseName(t, snap.awaitingKind.ifEmpty { "focus" })
-        val text = t.ready.replace("{phase}", phase)
+        val text = if (snap.status == "idle") t.finished else t.ready.replace("{phase}", phase)
         val builder = NotificationCompat.Builder(context, DONE)
             .setSmallIcon(R.drawable.ic_stat)
             .setContentTitle(t.finished)
@@ -94,10 +94,13 @@ class Notifier(private val context: Context) {
             .setContentIntent(openIntent())
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .addAction(0, t.play, serviceIntent(TimerService.NEXT))
+
             .addAction(0, t.dismiss, dismissIntent())
+        if (snap.status == "awaiting") builder.addAction(0, t.play, serviceIntent(TimerService.NEXT))
         manager.notify(DONE_ID, builder.build())
     }
+
+    fun cancelOngoing() { manager.cancel(ONGOING_ID) }
 
     fun cancelDone() {
         manager.cancel(DONE_ID)

@@ -170,9 +170,9 @@ class CoreTest {
     }
 
     @Test
-    fun stretchEndStartsTheBreakAndTheNextStretchWaits() {
+    fun stretchEndStartsTheBreakAndTheNextStretchWaitsWithoutAutoContinue() {
         val hint = StartHint("p", "Calculus", "Study", null, "", "phone", "sess", "tok")
-        val plan = Snap(workMillis = 25 * 60_000L, shortCount = 2, longCount = 0, shortMillis = 60_000L, longMillis = 15 * 60_000L, autoStart = true)
+        val plan = Snap(workMillis = 25 * 60_000L, shortCount = 2, longCount = 0, shortMillis = 60_000L, longMillis = 15 * 60_000L, autoStart = false)
         val first = arm(plan, "focus", 0, 0, hint)
         val afterStretch = finishSnap(first.snap, first.snap.alarmAtEpoch, first.snap.alarmAtElapsed, "due", "break", "tok2")
         assertTrue(afterStretch.chime)

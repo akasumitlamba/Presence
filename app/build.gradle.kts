@@ -13,8 +13,8 @@ android {
         applicationId = "app.presence"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "2.1.0"
+        versionCode = 10
+        versionName = "2.1.1"
     }
 
     buildTypes {

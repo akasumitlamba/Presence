@@ -78,6 +78,8 @@ class T(lang: String) {
     val tags = s("Tags", "Etiketler", "Etiquetas", "Etiquetas", "Étiquettes", "タグ", "태그")
     val newTag = s("New tag", "Yeni etiket", "Nueva etiqueta", "Nova etiqueta", "Nouvelle étiquette", "新しいタグ", "새 태그")
     val all = s("All", "Hepsi", "Todas", "Todas", "Toutes", "すべて", "전체")
+    val noGroup = s("No group", "Grup yok", "Sin grupo", "Sem grupo", "Aucun groupe", "グループなし", "그룹 없음")
+    val groups = s("Group", "Grup", "Grupo", "Grupo", "Groupe", "グループ", "그룹")
     val newGroup = s("New group", "Yeni grup", "Nuevo grupo", "Novo grupo", "Nouveau groupe", "新しいグループ", "새 그룹")
     val rename = s("Rename", "Yeniden adlandır", "Renombrar", "Renomear", "Renommer", "名前を変える", "이름 바꾸기")
     val deleteGroup = s("Delete this group?", "Bu grup silinsin mi?", "¿Eliminar este grupo?", "Apagar este grupo?", "Supprimer ce groupe ?", "このグループを削除しますか？", "이 그룹을 삭제할까요?")
@@ -90,8 +92,12 @@ class T(lang: String) {
     val minutes = s("Minutes", "Dakika", "Minutos", "Minutos", "Minutes", "分", "분")
     val seconds = s("Seconds", "Saniye", "Segundos", "Segundos", "Secondes", "秒", "초")
     val workTime = s("Work time", "Çalışma süresi", "Tiempo de trabajo", "Tempo de trabalho", "Temps de travail", "作業時間", "작업 시간")
+    val sessionStart = s("Start time", "Başlangıç saati", "Hora de inicio", "Hora de início", "Heure de début", "開始時刻", "시작 시간")
+    val recordedOverlap = s("This overlaps time already logged.", "Bu süre kayıtlı süreyle çakışıyor.", "Se solapa con tiempo ya registrado.", "Sobrepõe tempo já registado.", "Cela chevauche du temps déjà enregistré.", "記録済みの時間と重なります。", "이미 기록한 시간과 겹칩니다.")
+    val loggedTime = s("Logged", "Kaydedilen", "Registrado", "Registado", "Enregistré", "記録", "기록")
+    val pomodoroPreset = s("4 × 25 min · 5 min breaks", "4 × 25 dk · 5 dk mola", "4 × 25 min · pausas de 5 min", "4 × 25 min · pausas de 5 min", "4 × 25 min · pauses de 5 min", "25分 × 4 · 休憩5分", "25분 × 4 · 5분 휴식")
     val workHelp = s(
-        "The whole project. It is split into equal stretches.",
+        "Total focus time for one plan, split into equal stretches. Breaks are extra.",
         "Projenin tümü. Eşit dilimlere bölünür.",
         "El proyecto entero. Se reparte en tramos iguales.",
         "O projeto inteiro. Divide-se em trechos iguais.",
@@ -167,6 +173,7 @@ class T(lang: String) {
     val exportJson = s("Save a backup", "Yedek kaydet", "Guardar una copia", "Guardar uma cópia", "Enregistrer une copie", "控えを保存", "백업 저장")
     val exportCsv = s("Save a CSV", "CSV kaydet", "Guardar un CSV", "Guardar um CSV", "Enregistrer un CSV", "CSV を保存", "CSV 저장")
     val importJson = s("Bring in a backup", "Yedek getir", "Traer una copia", "Trazer uma cópia", "Importer une copie", "控えを読み込む", "백업 가져오기")
+    val fileError = s("Could not read or save the file. Please try another location.", "Dosya okunamadı veya kaydedilemedi. Başka bir konum deneyin.", "No se pudo leer o guardar el archivo. Prueba otra ubicación.", "Não foi possível ler ou guardar o ficheiro. Tente outro local.", "Impossible de lire ou enregistrer le fichier. Essayez un autre emplacement.", "ファイルを読み書きできません。別の保存先を試してください。", "파일을 읽거나 저장할 수 없습니다. 다른 위치를 선택하세요.")
     val badFile = s("That file isn’t a Presence backup.", "Bu dosya bir Presence yedeği değil.", "Ese archivo no es una copia de Presence.", "Esse arquivo não é uma cópia do Presence.", "Ce fichier n’est pas une copie Presence.", "Presence の控えではありません。", "Presence 백업이 아닙니다.")
     val imported = s("Brought in.", "Getirildi.", "Traído.", "Trazido.", "Importé.", "読み込みました。", "가져왔습니다.")
     val pair = s("Pair on Wi-Fi", "Wi-Fi’de eşle", "Emparejar por Wi-Fi", "Emparelhar no Wi-Fi", "Apparier en Wi-Fi", "Wi-Fi でペア", "Wi-Fi로 짝짓기")

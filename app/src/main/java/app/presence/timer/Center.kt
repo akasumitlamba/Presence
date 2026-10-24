@@ -28,6 +28,7 @@ class TimerCenter(
     fun start(kind: String, project: Rec?, task: Rec?) {
         synchronized(lock) {
             val current = repo.currentSnap()
+            if (kind !in setOf("focus", "track", "short", "long")) return
             if (current.status == "running" || current.status == "paused") return
             val resolved = project ?: current.projectId?.let { id ->
                 repo.snapshot().find { it.kind == KIND_PROJECT && it.id == id && !it.deleted }
@@ -46,7 +47,7 @@ class TimerCenter(
             }
             val nowE = System.currentTimeMillis()
             val nowL = android.os.SystemClock.elapsedRealtime()
-            val hint = if (resolved == null && current.projectId != null) {
+            val hint = if (current.status == "awaiting" || (resolved == null && current.projectId != null)) {
                 StartHint(
                     current.projectId,
                     current.projectName,
@@ -60,7 +61,7 @@ class TimerCenter(
             } else {
                 hint(resolved, task)
             }
-            val step = arm(tuned, kind, nowE, nowL, hint)
+            val step = arm(tuned, if (current.status == "awaiting") current.awaitingKind.ifEmpty { "focus" } else kind, nowE, nowL, hint)
             apply(step)
         }
     }
@@ -150,7 +151,9 @@ class TimerCenter(
             project.f("shortCount").toIntOrNull()?.let { shorts = it.coerceIn(0, 24) }
             project.f("longCount").toIntOrNull()?.let { longs = it.coerceIn(0, 24) }
         }
-        return withSettings(snap, work, shortMs, longMs, shorts, longs)
+        return withSettings(snap, work, shortMs, longMs, shorts, longs).let {
+            if (snap.status == "idle") it.copy(countUp = globals.countUp, autoStart = globals.auto) else it
+        }
     }
 
     private fun hint(project: Rec?, task: Rec?): StartHint {

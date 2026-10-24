@@ -14,8 +14,10 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -43,6 +45,8 @@ class Lan(
     private val seen = ConcurrentHashMap<String, Seen>()
     private val names = ConcurrentHashMap<String, String>()
     private val queue = ArrayDeque<NsdServiceInfo>()
+    private val syncGate = Mutex()
+    private var offerJob: Job? = null
     private var resolving = false
     private var browsing = false
     private var advertised: String? = "\u0000"
@@ -52,9 +56,17 @@ class Lan(
 
     fun start() {
         main.launch {
-            if (!multicast.isHeld) multicast.acquire()
-            browse()
-            advertise(null)
+            try {
+                if (!multicast.isHeld) multicast.acquire()
+                browse()
+                advertise(null)
+            } catch (_: SecurityException) { message.value = "dropped" }
+        }
+        scope.launch {
+            while (true) {
+                delay(30_000)
+                auto()
+            }
         }
         val cm = context.getSystemService(ConnectivityManager::class.java)
         val request = NetworkRequest.Builder()
@@ -72,7 +84,9 @@ class Lan(
     }
 
     fun showCode() {
-        scope.launch {
+        offerJob?.cancel()
+        retryDiscovery()
+        offerJob = scope.launch {
             if (!onLocalLink(context)) {
                 message.value = "dropped"
                 return@launch
@@ -102,10 +116,17 @@ class Lan(
                     offerUntil.value = node.offerUntil
                 }
             }
+            if (offer.value != null && node.offerCode == null) {
+                offer.value = null
+                offerUntil.value = 0L
+                message.value = "paired"
+                main.launch { advertise(null) }
+            }
         }
     }
 
     fun hideCode() {
+        offerJob?.cancel()
         node.retireOffer()
         offer.value = null
         offerUntil.value = 0L
@@ -113,12 +134,17 @@ class Lan(
     }
 
     fun enter(code: String) {
+        retryDiscovery()
         scope.launch {
             if (!onLocalLink(context)) {
                 message.value = "dropped"
                 return@launch
             }
             val typed = code.trim()
+            if (typed.length != 4 || typed.any { it !in '0'..'9' }) {
+                message.value = "wrong_code"
+                return@launch
+            }
             if (typed.isNotEmpty() && typed == node.offerCode) {
                 message.value = "self"
                 return@launch
@@ -135,6 +161,7 @@ class Lan(
                 return@launch
             }
             var expired = false
+            var unreachable = false
             for (peer in offers) {
                 if (peer.id == repo.deviceId()) {
                     message.value = "self"
@@ -154,16 +181,17 @@ class Lan(
                         return@launch
                     }
                     "io" -> {
-                        message.value = if (!onLocalLink(context)) "dropped" else "left"
-                        return@launch
+                        unreachable = true
+                        if (!onLocalLink(context)) { message.value = "dropped"; return@launch }
                     }
                 }
             }
-            message.value = if (expired) "expired" else "wrong_code"
+            message.value = if (expired) "expired" else if (unreachable) "left" else "wrong_code"
         }
     }
 
     fun syncNow(peerId: String) {
+        retryDiscovery()
         scope.launch {
             if (!onLocalLink(context)) {
                 message.value = "dropped"
@@ -192,14 +220,24 @@ class Lan(
 
     fun auto() {
         scope.launch {
-            if (!onLocalLink(context)) return@launch
-            val me = repo.deviceId()
-            for (peer in repo.peers()) {
-                if (me <= peer.id) continue
-                val found = seen[peer.id] ?: continue
-                val result = node.sync(found.host, found.port, peer.id)
-                if (result.ok) repo.touchPeer(peer.id)
-            }
+            if (!onLocalLink(context) || !syncGate.tryLock()) return@launch
+            try {
+                for (peer in repo.peers()) {
+                    val found = seen[peer.id] ?: continue
+                    val result = node.sync(found.host, found.port, peer.id)
+                    if (result.ok) repo.touchPeer(peer.id)
+                }
+            } finally { syncGate.unlock() }
+        }
+    }
+
+    private fun retryDiscovery() {
+        main.launch {
+            try {
+                if (!multicast.isHeld) multicast.acquire()
+                browse()
+                advertise(node.offerCode)
+            } catch (_: SecurityException) { message.value = "dropped" }
         }
     }
 
@@ -255,6 +293,7 @@ class Lan(
                         val name = serviceInfo.attributes?.get("nm")?.toString(Charsets.UTF_8) ?: "Presence"
                         seen[id] = Seen(id, name, host, serviceInfo.port, code)
                         names[serviceInfo.serviceName] = id
+                        auto()
                     }
                     synchronized(queue) { drain() }
                 }
@@ -311,7 +350,7 @@ class Lan(
             port = node.port
             setAttribute("id", repo.deviceId())
             setAttribute("nm", repo.deviceName().take(32))
-            if (!code.isNullOrEmpty()) setAttribute("code", code)
+            if (!code.isNullOrEmpty()) setAttribute("code", "offered")
         }
         registration = listener
         try {
@@ -322,11 +361,13 @@ class Lan(
     }
 }
 
-fun onLocalLink(context: Context): Boolean {
+fun localNetwork(context: Context): Network? {
     val cm = context.getSystemService(ConnectivityManager::class.java)
-    return cm.allNetworks.any { network ->
-        val caps = cm.getNetworkCapabilities(network) ?: return@any false
+    return cm.allNetworks.firstOrNull { network ->
+        val caps = cm.getNetworkCapabilities(network) ?: return@firstOrNull false
         caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
     }
 }
+
+fun onLocalLink(context: Context): Boolean = localNetwork(context) != null

@@ -54,7 +54,7 @@ class PresenceWidget : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_action, serviceClick(context, action))
             val nowE = System.currentTimeMillis()
             val nowL = SystemClock.elapsedRealtime()
-            if (snap.status == "running" && snap.kind != "track") {
+            if (snap.status == "running" && snap.kind != "track" && !snap.countUp) {
                 views.setViewVisibility(R.id.widget_plain, View.GONE)
                 views.setViewVisibility(R.id.widget_time, View.VISIBLE)
                 views.setChronometer(R.id.widget_time, SystemClock.elapsedRealtime() + displayMillis(snap, nowE, nowL), null, true)
@@ -69,7 +69,7 @@ class PresenceWidget : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_plain, View.VISIBLE)
                 val globals = app.repo.globals()
                 val idle = stretchLengths(globals.workMillis, stretchCount(globals.shortCount, globals.longCount)).first()
-                val shown = if (snap.status == "idle") idle else displayMillis(snap, nowE, nowL)
+                val shown = if (snap.status == "idle") { if (globals.countUp) 0L else idle } else displayMillis(snap, nowE, nowL)
                 views.setTextViewText(R.id.widget_plain, clockDigits(shown))
             }
             return views

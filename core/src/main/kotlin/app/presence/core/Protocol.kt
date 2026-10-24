@@ -7,6 +7,7 @@ import java.io.DataOutputStream
 import java.io.EOFException
 import java.io.IOException
 import java.net.InetSocketAddress
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.UUID
@@ -80,8 +81,8 @@ fun recordsToJson(records: List<Rec>): JSONObject {
 }
 
 fun recordsFromJson(obj: JSONObject): List<Rec> {
-    if (obj.optString("t") != "records") return emptyList()
-    val array = obj.optJSONArray("items") ?: return emptyList()
+    if (obj.optString("t") != "records") throw IOException("records")
+    val array = obj.optJSONArray("items") ?: throw IOException("items")
     return buildList {
         for (i in 0 until array.length()) add(recFromJson(array.getJSONObject(i)))
     }
@@ -89,6 +90,7 @@ fun recordsFromJson(obj: JSONObject): List<Rec> {
 
 class Node(
     private val catalog: Catalog,
+    private val newSocket: () -> Socket = { Socket() },
     private val clock: () -> Long,
 ) {
     @Volatile var offerCode: String? = null
@@ -162,6 +164,7 @@ class Node(
         val hello = JSONObject()
             .put("t", "hello")
             .put("mode", "sync")
+            .put("peerId", peerId)
             .put("deviceId", catalog.deviceId())
             .put("name", catalog.deviceName())
             .put("token", token)
@@ -169,12 +172,16 @@ class Node(
     }
 
     private fun exchange(host: String, port: Int, hello: JSONObject, pairing: Boolean): SyncResult {
-        val socket = Socket()
+        var socket: Socket? = null
         try {
-            socket.connect(InetSocketAddress(host, port), 4_000)
-            socket.soTimeout = 8_000
-            val input = DataInputStream(socket.getInputStream())
-            val output = DataOutputStream(socket.getOutputStream())
+            val connection = newSocket()
+            socket = connection
+            val address = InetAddress.getByName(host)
+            if (!isLocalAddress(address)) return SyncResult(false, "not_local")
+            connection.connect(InetSocketAddress(address, port), 4_000)
+            connection.soTimeout = 8_000
+            val input = DataInputStream(connection.getInputStream())
+            val output = DataOutputStream(connection.getOutputStream())
             Frame.write(output, hello)
             val reply = Frame.read(input) ?: return SyncResult(false, "io")
             if (reply.optString("t") == "hello_fail") {
@@ -184,19 +191,21 @@ class Node(
             val peerId = reply.optString("deviceId")
             val peerName = reply.optString("name")
             val token = reply.optString("token")
-            synchronized(gate) {
+            if (peerId.isEmpty() || peerId == catalog.deviceId() || token.isEmpty()) return SyncResult(false, "io")
+            if (!pairing && (peerId != hello.optString("peerId", peerId) || token != hello.optString("token"))) return SyncResult(false, "no_token")
+            run {
                 val mine = catalog.snapshot().forSync()
                 Frame.write(output, recordsToJson(mine))
                 val theirs = Frame.read(input) ?: return SyncResult(false, "io")
-                catalog.mergeFrom(recordsFromJson(theirs))
+                catalog.mergeFrom(recordsFromJson(theirs).forSync())
             }
             if (pairing) catalog.rememberPeer(peerId, peerName, token)
             return SyncResult(true, "ok", peerId, peerName)
-        } catch (_: IOException) {
+        } catch (_: Exception) {
             return SyncResult(false, "io")
         } finally {
             try {
-                socket.close()
+                socket?.close()
             } catch (_: IOException) {
             }
         }
@@ -204,6 +213,7 @@ class Node(
 
     private fun handle(socket: Socket) {
         try {
+            if (!isLocalAddress(socket.inetAddress)) return
             socket.soTimeout = 8_000
             val input = DataInputStream(socket.getInputStream())
             val output = DataOutputStream(socket.getOutputStream())
@@ -242,7 +252,7 @@ class Node(
                         return
                     }
                 }
-            } else {
+            } else if (mode == "sync") {
                 val known = catalog.tokenFor(remoteId)
                 val token = hello.optString("token")
                 if (known.isNullOrEmpty() || known != token) {
@@ -257,19 +267,21 @@ class Node(
                         .put("name", catalog.deviceName())
                         .put("token", known),
                 )
-            }
+            } else return
             val incomingMsg = Frame.read(input) ?: return
-            synchronized(gate) {
-                val mine = catalog.snapshot().forSync()
-                catalog.mergeFrom(recordsFromJson(incomingMsg))
-                Frame.write(output, recordsToJson(mine))
+            val incoming = recordsFromJson(incomingMsg).forSync()
+            val mine = synchronized(gate) {
+                val snapshot = catalog.snapshot().forSync()
+                catalog.mergeFrom(incoming)
+                snapshot
             }
             val tokenToKeep = pairedToken
             if (mode == "pair" && tokenToKeep != null) {
                 catalog.rememberPeer(remoteId, hello.optString("name"), tokenToKeep)
                 retireOffer()
             }
-        } catch (_: IOException) {
+            Frame.write(output, recordsToJson(mine))
+        } catch (_: Exception) {
         } finally {
             try {
                 socket.close()
@@ -281,7 +293,11 @@ class Node(
     private fun fail(reason: String) = JSONObject().put("t", "hello_fail").put("reason", reason)
 }
 
-fun List<Rec>.forSync(): List<Rec> = filter { it.kind in SYNC_KINDS }
+fun List<Rec>.forSync(): List<Rec> = filter {
+    it.kind in SYNC_KINDS &&
+        (it.kind != KIND_PREF || it.id in TIMER_PREF_IDS) &&
+        (it.kind != KIND_SESSION || it.deleted || it.f("endedAt").isNotEmpty())
+}
 
 fun encodeBackup(records: List<Rec>): String {
     val items = recordsToJson(records).getJSONArray("items")
@@ -332,3 +348,8 @@ class MemoryCatalog(
         }
     }
 }
+
+// Android needs INTERNET permission for LAN sockets; Presence accepts only local addresses.
+fun isLocalAddress(address: InetAddress): Boolean =
+    address.isLoopbackAddress || address.isLinkLocalAddress || address.isSiteLocalAddress ||
+        (address is java.net.Inet6Address && (address.address[0].toInt() and 0xfe) == 0xfc)

@@ -39,16 +39,24 @@ class PresenceApp : Application() {
         center = TimerCenter(repo) { step -> reactTo(step) }
         scope.launch {
             repo.open()
-            val started = Node(repo) { System.currentTimeMillis() }
-            started.start()
-            node = started
-            val link = Lan(this@PresenceApp, repo, started)
-            lan = link
-            link.start()
-            ready.complete(Unit)
             center.catchUp()
             Reminders.reschedule(this@PresenceApp)
             HomeWidgets.update(this@PresenceApp)
+            try {
+                val started = Node(repo, newSocket = {
+                    val network = app.presence.sync.localNetwork(this@PresenceApp)
+                        ?: throw java.io.IOException("No local network")
+                    network.socketFactory.createSocket()
+                }) { System.currentTimeMillis() }
+                started.start()
+                node = started
+                val link = Lan(this@PresenceApp, repo, started)
+                lan = link
+                link.start()
+            } catch (_: Exception) {
+                // Local discovery being unavailable must not disable the offline timer.
+            }
+            ready.complete(Unit)
         }
     }
 }
