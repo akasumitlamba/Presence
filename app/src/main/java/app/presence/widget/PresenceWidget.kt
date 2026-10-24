@@ -10,8 +10,8 @@ import android.widget.RemoteViews
 import app.presence.PresenceApp
 import app.presence.R
 import app.presence.core.clockDigits
-import app.presence.core.displayMillis
 import app.presence.core.elapsedWork
+import app.presence.core.timeLeft
 import app.presence.core.stretchCount
 import app.presence.core.stretchLengths
 import app.presence.timer.TimerService
@@ -54,10 +54,10 @@ class PresenceWidget : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_action, serviceClick(context, action))
             val nowE = System.currentTimeMillis()
             val nowL = SystemClock.elapsedRealtime()
-            if (snap.status == "running" && snap.kind != "track" && !snap.countUp) {
+            if (snap.status == "running" && snap.kind != "track") {
                 views.setViewVisibility(R.id.widget_plain, View.GONE)
                 views.setViewVisibility(R.id.widget_time, View.VISIBLE)
-                views.setChronometer(R.id.widget_time, SystemClock.elapsedRealtime() + displayMillis(snap, nowE, nowL), null, true)
+                views.setChronometer(R.id.widget_time, SystemClock.elapsedRealtime() + timeLeft(snap, nowE, nowL), null, true)
                 views.setChronometerCountDown(R.id.widget_time, true)
             } else if (snap.status == "running") {
                 views.setViewVisibility(R.id.widget_plain, View.GONE)
@@ -69,7 +69,7 @@ class PresenceWidget : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_plain, View.VISIBLE)
                 val globals = app.repo.globals()
                 val idle = stretchLengths(globals.workMillis, stretchCount(globals.shortCount, globals.longCount)).first()
-                val shown = if (snap.status == "idle") { if (globals.countUp) 0L else idle } else displayMillis(snap, nowE, nowL)
+                val shown = if (snap.status == "idle") idle else if (snap.kind == "track") elapsedWork(snap, nowE, nowL) else timeLeft(snap, nowE, nowL)
                 views.setTextViewText(R.id.widget_plain, clockDigits(shown))
             }
             return views

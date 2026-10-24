@@ -134,7 +134,7 @@ import app.presence.core.dayKey
 import app.presence.core.dayTotals
 import app.presence.core.decodeBackup
 import app.presence.core.elapsedWork
-import app.presence.core.displayMillis
+import app.presence.core.timeLeft
 import app.presence.core.encodeBackup
 import app.presence.core.f
 import app.presence.core.freeProjectIds
@@ -240,7 +240,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     }
     val nowE = System.currentTimeMillis()
     val nowL = SystemClock.elapsedRealtime()
-    val shown = displayMillis(snap, nowE, nowL)
+    val shown = if (snap.kind == "track") elapsedWork(snap, nowE, nowL) else timeLeft(snap, nowE, nowL)
     if (tick < 0) return
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
@@ -375,7 +375,7 @@ private fun TimerPage(
         snap.status == "idle" || snap.status == "awaiting" -> t.focus
         else -> phase(t, snap.kind)
     }
-    val face = if (snap.status == "idle") { if (globals.countUp) 0L else lengths.first() } else shown
+    val face = if (snap.status == "idle") lengths.first() else shown
     val phaseWorked = elapsedWork(snap, System.currentTimeMillis(), SystemClock.elapsedRealtime())
     val loggedId = if (open) snap.projectId else project?.id
     val logged = if (loggedId == null) 0L else workedMillisFor(rows, loggedId)
@@ -451,27 +451,18 @@ private fun TimerPage(
                     TonalButton(onClick = { app.center.stop() }, modifier = stopMod) { Text(t.stop) }
                 }
             }
-            if (!open && canBegin) {
-                TonalButton(onClick = { app.center.start("track", project, task) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(t.trackTime)
-                }
-            }
-            if (snap.status == "running" || snap.status == "paused") {
-                if (snap.kind != "track") TextButton(onClick = { app.center.skip() }) { Text(t.skip) }
-            }
             if (snap.status == "awaiting") Text(t.waiting)
-            if (!canBegin && !open) TonalButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) { Text(t.newProject) }
             if (!notificationsOn) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
         }
     }
     val ring = @Composable {
         Box(Modifier.size(280.dp), contentAlignment = Alignment.Center) {
             val color = MaterialTheme.colorScheme.primary
-            val track = MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
+            val track = MaterialTheme.colorScheme.outline
             val dot = MaterialTheme.colorScheme.onSurface
             Canvas(Modifier.fillMaxSize().padding(12.dp)) {
-                val gapDeg = minOf(16f, 120f / stretches)
-                val sweep = (360f - gapDeg * stretches) / stretches
+                val gapDeg = 16f
+                val sweep = ((360f - gapDeg * stretches) / stretches).coerceAtLeast(8f)
                 val stroke = Stroke(22f, cap = StrokeCap.Round)
                 val onStretch = snap.kind == "focus" && (snap.status == "running" || snap.status == "paused")
                 val doneCount = when {
@@ -480,7 +471,7 @@ private fun TimerPage(
                     else -> snap.stretchIndex.coerceIn(0, stretches)
                 }
                 val partial = if (onStretch && snap.phaseMillis > 0L) {
-                    (phaseWorked.toFloat() / snap.phaseMillis.toFloat()).coerceIn(0f, 1f)
+                    (1f - shown.toFloat() / snap.phaseMillis.toFloat()).coerceIn(0f, 1f)
                 } else {
                     0f
                 }
@@ -510,9 +501,8 @@ private fun TimerPage(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(label, style = MaterialTheme.typography.titleMedium)
-                if (open && snap.kind != "track") Text(t.cycleLine((snap.stretchIndex + 1).coerceAtMost(stretches), stretches), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(clockDigits(face), style = MaterialTheme.typography.displayLarge)
-                Text("${t.loggedTime} · ${clockDigits(spent)}", style = MaterialTheme.typography.titleMedium)
+                Text(clockDigits(spent), style = MaterialTheme.typography.titleMedium)
             }
         }
     }
@@ -758,8 +748,6 @@ private fun ProjectDetail(
     var newTask by remember { mutableStateOf(false) }
     var goalOpen by remember { mutableStateOf(false) }
     var deleteTask by remember { mutableStateOf<Rec?>(null) }
-    var editTask by remember { mutableStateOf<Rec?>(null) }
-    var newGroup by remember { mutableStateOf(false) }
     var newTag by remember { mutableStateOf(false) }
     var editTag by remember { mutableStateOf<Rec?>(null) }
     var name by remember(project.id) { mutableStateOf(project.f("name")) }
@@ -783,12 +771,6 @@ private fun ProjectDetail(
             modifier = Modifier.fillMaxWidth(),
             colors = presenceFieldColors(),
         )
-        val groups = rows.alive(KIND_GROUP)
-        MenuField(t.groups, t.groups, groups.find { it.id == project.f("groupId") }?.f("name") ?: t.noGroup,
-            listOf("" to t.noGroup) + groups.map { it.id to it.f("name") }) { groupId ->
-            app.repo.put(project.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = project.body + ("groupId" to groupId)))
-        }
-        TextButton(onClick = { newGroup = true }) { Text(t.newGroup) }
         Text(t.goal, style = MaterialTheme.typography.titleLarge)
         val goalMinutes = project.f("goalMinutes").toIntOrNull()
         val deadline = project.f("goalDeadline").toLongOrNull()
@@ -872,7 +854,7 @@ private fun ProjectDetail(
                         app.repo.put(task.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
                     }
                 })
-                Text(task.f("title") + if (locked) " · " + t.locked else "", modifier = Modifier.weight(1f).clickable { editTask = task })
+                Text(task.f("title") + if (locked) " · " + t.locked else "", modifier = Modifier.weight(1f))
                 TextButton(onClick = { deleteTask = task }) { Text(t.delete) }
             }
         }
@@ -891,38 +873,6 @@ private fun ProjectDetail(
             app.repo.put(tag.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = body))
             editTag = null
         }
-    }
-    if (newGroup) {
-        NameDialog(t.newGroup, "", t, { newGroup = false }) { title ->
-            app.repo.put(app.repo.writerNow(KIND_GROUP, UUID.randomUUID().toString(), mapOf("name" to title)))
-            newGroup = false
-        }
-    }
-    editTask?.let { item ->
-        var title by remember(item.id) { mutableStateOf(item.f("title")) }
-        var picked by remember(item.id) { mutableStateOf(item.f("tags").split(",").filter { it.isNotBlank() }.toSet()) }
-        AlertDialog(
-            onDismissRequest = { editTask = null },
-            title = { Text(t.tasks) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(title, { title = it }, label = { Text(t.name) }, modifier = Modifier.fillMaxWidth(), colors = presenceFieldColors())
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        tags.forEach { tag ->
-                            PresenceChip(selected = tag.id in picked, onClick = {
-                                picked = if (tag.id in picked) picked - tag.id else picked + tag.id
-                            }, label = { Text(tag.f("name")) })
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
-                val latest = app.repo.snapshot().find { it.kind == KIND_TASK && it.id == item.id } ?: item
-                app.repo.put(latest.copy(updatedAt = System.currentTimeMillis(), writerId = app.repo.deviceId(), body = latest.body + mapOf("title" to title.trim(), "tags" to picked.joinToString(","))))
-                editTask = null
-            }) { Text(t.save) } },
-            dismissButton = { TextButton(onClick = { editTask = null }) { Text(t.cancel) } },
-        )
     }
     if (newTask) {
         NameDialog(t.newTask, "", t, { newTask = false }) { title ->
@@ -973,13 +923,6 @@ private fun PlanSections(
 ) {
     val lengths = stretchLengths(workSec.coerceAtLeast(1L) * 1_000L, stretchCount(shortCount, longCount))
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        TonalButton(onClick = {
-            onWork(100 * 60L)
-            onShortCount(3)
-            onLongCount(0)
-            onShort(5 * 60L)
-            onLong(15 * 60L)
-        }, modifier = Modifier.fillMaxWidth()) { Text(t.pomodoroPreset) }
         FieldSection(t.workTime, t.workHelp) {
             HmsFields(t, workSec, onWork)
             Text(t.stretchSummary(stretchCount(shortCount, longCount), clockDigits(lengths.first())), color = MaterialTheme.colorScheme.onSurface)
@@ -1021,15 +964,15 @@ private fun HmsFields(t: T, totalSec: Long, onSec: (Long) -> Unit) {
     var minutes by remember(totalSec) { mutableStateOf(parts.second.toString()) }
     var seconds by remember(totalSec) { mutableStateOf(parts.third.toString()) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        UnitBox(t.hours, hours, Modifier.weight(1f)) {
+        UnitBox(t.hours, hours) {
             hours = it
             onSec(joinSeconds(it, minutes, seconds))
         }
-        UnitBox(t.minutes, minutes, Modifier.weight(1f)) {
+        UnitBox(t.minutes, minutes) {
             minutes = it
             onSec(joinSeconds(hours, it, seconds))
         }
-        UnitBox(t.seconds, seconds, Modifier.weight(1f)) {
+        UnitBox(t.seconds, seconds) {
             seconds = it
             onSec(joinSeconds(hours, minutes, it))
         }
@@ -1037,14 +980,14 @@ private fun HmsFields(t: T, totalSec: Long, onSec: (Long) -> Unit) {
 }
 
 @Composable
-private fun UnitBox(label: String, value: String, modifier: Modifier, onValue: (String) -> Unit) {
+private fun UnitBox(label: String, value: String, onValue: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = { raw -> onValue(raw.filter { it.isDigit() }.take(2)) },
         label = { Text(label) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = modifier,
+        modifier = Modifier.width(104.dp),
         colors = presenceFieldColors(),
     )
 }
@@ -1648,14 +1591,6 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
             onShort = { app.repo.setPref("short_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
             onLong = { app.repo.setPref("long_sec", it.coerceAtLeast(1L).toString()); app.center.refreshSettings() },
         )
-        SwitchSetting(t.countUp, t.countUpHelp, globals.countUp) {
-            app.repo.setPref("count_up", if (it) "1" else "0")
-            app.center.refreshSettings()
-        }
-        SwitchSetting(t.autoContinue, t.autoHelp, globals.auto) {
-            app.repo.setPref("auto_start", if (it) "1" else "0")
-            app.center.refreshSettings()
-        }
         Stepper(t, t.dayStarts, t.dayHelp, globals.dayStart, 0, 6) { app.repo.setPref("day_start", it.toString()) }
         Text(t.reminders, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
         ReminderRow(t.dailyReminder, t.dailyHelp, globals.dailyOn, globals.dailyHour, globals.dailyMinute, { on ->

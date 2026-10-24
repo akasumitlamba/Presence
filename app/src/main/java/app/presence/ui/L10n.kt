@@ -78,8 +78,6 @@ class T(lang: String) {
     val tags = s("Tags", "Etiketler", "Etiquetas", "Etiquetas", "Étiquettes", "タグ", "태그")
     val newTag = s("New tag", "Yeni etiket", "Nueva etiqueta", "Nova etiqueta", "Nouvelle étiquette", "新しいタグ", "새 태그")
     val all = s("All", "Hepsi", "Todas", "Todas", "Toutes", "すべて", "전체")
-    val noGroup = s("No group", "Grup yok", "Sin grupo", "Sem grupo", "Aucun groupe", "グループなし", "그룹 없음")
-    val groups = s("Group", "Grup", "Grupo", "Grupo", "Groupe", "グループ", "그룹")
     val newGroup = s("New group", "Yeni grup", "Nuevo grupo", "Novo grupo", "Nouveau groupe", "新しいグループ", "새 그룹")
     val rename = s("Rename", "Yeniden adlandır", "Renombrar", "Renomear", "Renommer", "名前を変える", "이름 바꾸기")
     val deleteGroup = s("Delete this group?", "Bu grup silinsin mi?", "¿Eliminar este grupo?", "Apagar este grupo?", "Supprimer ce groupe ?", "このグループを削除しますか？", "이 그룹을 삭제할까요?")
@@ -94,10 +92,8 @@ class T(lang: String) {
     val workTime = s("Work time", "Çalışma süresi", "Tiempo de trabajo", "Tempo de trabalho", "Temps de travail", "作業時間", "작업 시간")
     val sessionStart = s("Start time", "Başlangıç saati", "Hora de inicio", "Hora de início", "Heure de début", "開始時刻", "시작 시간")
     val recordedOverlap = s("This overlaps time already logged.", "Bu süre kayıtlı süreyle çakışıyor.", "Se solapa con tiempo ya registrado.", "Sobrepõe tempo já registado.", "Cela chevauche du temps déjà enregistré.", "記録済みの時間と重なります。", "이미 기록한 시간과 겹칩니다.")
-    val loggedTime = s("Logged", "Kaydedilen", "Registrado", "Registado", "Enregistré", "記録", "기록")
-    val pomodoroPreset = s("4 × 25 min · 5 min breaks", "4 × 25 dk · 5 dk mola", "4 × 25 min · pausas de 5 min", "4 × 25 min · pausas de 5 min", "4 × 25 min · pauses de 5 min", "25分 × 4 · 休憩5分", "25분 × 4 · 5분 휴식")
     val workHelp = s(
-        "Total focus time for one plan, split into equal stretches. Breaks are extra.",
+        "The whole project. It is split into equal stretches.",
         "Projenin tümü. Eşit dilimlere bölünür.",
         "El proyecto entero. Se reparte en tramos iguales.",
         "O projeto inteiro. Divide-se em trechos iguais.",

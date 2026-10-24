@@ -13,17 +13,13 @@ Package: `app.presence`. Licensed under the Apache License, Version 2.0. See [LI
 
 The APK is signed and can be installed without Play Store billing.
 
-For the 2.1.1 signing change and migration steps, read the [release notes](docs/releases/v2.1.1.md) before replacing an existing install.
-
 ## Features
 
 Everything in Presence is free. There is no premium tier and no tester switch.
 
-- Focus, short rest, and long rest, with lengths, cycle count, and count up or count down
-- Pause, resume, stop, and skip
-- Optional auto-continue
-- One-tap tracking
-- Projects, tasks, tags, and groups, including Work, Study, and Personal
+- Work time split into equal stretches, with short and long breaks between them
+- Play, pause, and stop
+- Projects, tasks, and tags. A project is a name, and it can be deleted
 - A todo list: add, complete, and delete
 - A project goal and the daily target that shrinks as you log time
 - Today, week, month, and year, with a bar chart, a pie chart, and a month calendar
@@ -44,17 +40,13 @@ Everything in Presence is free. There is no premium tier and no tester switch.
 
 Source Sans 3 is bundled for the app and the widgets. Its license is in `third_party/source-sans-3/LICENSE.md`.
 
-## Focus plans and tracking
+## Focus plans
 
-Work time is the total focus budget for one plan, not a project estimate or one interval. The plan has one more focus stretch than the number of breaks; break time is added separately. For example, 60 minutes and two short breaks gives three 20-minute focus stretches.
+Work time is one project duration. The default is one hour. Stretch count is the short-break count plus the long-break count plus one, and each stretch is that duration divided evenly. One hour with two short breaks is three 20-minute stretches. A different duration splits the same way.
 
-Use **4 × 25 min · 5 min breaks** in global or project timer settings for a familiar Pomodoro plan: four 25-minute focus stretches and three 5-minute breaks. The plan finishes after the fourth stretch. Custom long breaks are distributed within a plan.
+Breaks start when a stretch ends. The next stretch waits until Play. Stop ends the sitting, including one that is waiting after a break. Pauses are not work and are not written into stats. The circle is split into one arc per stretch, and the center shows the time left in the current phase.
 
-Breaks start when a focus stretch ends. The next focus stretch waits for Play unless **Continue on its own** is enabled. Skip moves past the current phase while keeping only actual elapsed work. Stop cancels the whole plan, including a plan waiting after a break. Track time is a stopwatch with no automatic breaks. Count up changes the display, not the focus deadline.
-
-Settings changes apply to the next plan; an active plan retains its lengths and selected project/task. Only focus and tracking count toward goals and statistics; rests and pauses do not. Delayed alarms never count extra focus time.
-
-Tap a task title in project details to rename it or assign tags. Groups can be selected or created in project details.
+Settings changes apply to the next sitting. An open sitting keeps its lengths and its project. Only focus counts toward goals and statistics. A late alarm does not add the delay as work or as a pause.
 
 ## Pair two phones
 

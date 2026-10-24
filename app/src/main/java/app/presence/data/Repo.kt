@@ -197,12 +197,9 @@ class Repo(private val context: Context) : Catalog {
                 )
             }
             val writer = deviceIdLocked()
-            if (rows.none { it.kind == KIND_GROUP }) {
-                dao.upsert(listOf(
-                    app.presence.core.GROUP_WORK to "Work",
-                    app.presence.core.GROUP_STUDY to "Study",
-                    app.presence.core.GROUP_PERSONAL to "Personal",
-                ).map { (id, name) -> Rec(KIND_GROUP, id, now, writer, false, mapOf("name" to name)).toEntity() })
+            val staleGroups = dao.all().filter { it.kind == KIND_GROUP && !it.deleted }
+            if (staleGroups.isNotEmpty()) {
+                dao.upsert(staleGroups.map { it.copy(deleted = true, updatedAt = now) })
             }
             val have = dao.all().filter { it.kind == KIND_PREF }.map { it.id }.toSet()
             val defaults = mapOf(

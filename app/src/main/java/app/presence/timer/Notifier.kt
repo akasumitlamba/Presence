@@ -13,8 +13,8 @@ import app.presence.MainActivity
 import app.presence.R
 import app.presence.core.Snap
 import app.presence.core.clockDigits
-import app.presence.core.displayMillis
 import app.presence.core.elapsedWork
+import app.presence.core.timeLeft
 import app.presence.ui.T
 import app.presence.ui.resolveLang
 
@@ -60,7 +60,7 @@ class Notifier(private val context: Context) {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-        if (snap.status == "running" && snap.kind != "track" && !snap.countUp) {
+        if (snap.status == "running" && snap.kind != "track") {
             builder.setWhen(snap.alarmAtEpoch)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(true)
@@ -72,7 +72,7 @@ class Notifier(private val context: Context) {
                 .setContentText(phase)
         } else {
             builder.setUsesChronometer(false)
-                .setContentText(t.paused + " " + clockDigits(displayMillis(snap, nowE, nowL)))
+                .setContentText(t.paused + " " + clockDigits(if (snap.kind == "track") elapsedWork(snap, nowE, nowL) else timeLeft(snap, nowE, nowL)))
         }
         if (snap.status == "running") {
             builder.addAction(0, t.pause, serviceIntent(TimerService.PAUSE))
