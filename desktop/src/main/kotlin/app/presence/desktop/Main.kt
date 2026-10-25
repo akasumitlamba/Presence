@@ -33,6 +33,9 @@ fun main() {
     application {
         var visible by remember { mutableStateOf(true) }
         var exiting by remember { mutableStateOf(false) }
+        val mainState = rememberWindowState(width = 1180.dp,height = 800.dp)
+        var openRequest by remember { mutableIntStateOf(0) }
+        val openMain = { visible = true; mainState.isMinimized = false; openRequest++ }
         val widgets = remember { mutableStateListOf<String>() }
         var traySupported by remember { mutableStateOf(false) }
         SideEffect { app.openWidget = { id -> if(id !in widgets) widgets.add(id) } }
@@ -42,10 +45,10 @@ fun main() {
             var linux: LinuxTray? = null
             if (System.getProperty("os.name").startsWith("Linux")) {
                 runCatching {
-                    linux = LinuxTray({ visible = true }, {
+                    linux = LinuxTray({ openMain() }, {
                         val s = app.center.snap()
-                        if(s.status == "running") app.center.pause() else if(s.status == "paused") app.center.resume() else visible = true
-                    }, { app.center.stop() }, { id -> if(id !in widgets) widgets.add(id) }, { exiting = true; visible = true })
+                        if(s.status == "running") app.center.pause() else if(s.status == "paused") app.center.resume() else openMain()
+                    }, { app.center.stop() }, { id -> if(id !in widgets) widgets.add(id) }, { exiting = true; openMain() })
                     app.notifier.nativeNotify = { title, body -> linux?.notify(title,body) }
                     traySupported = true
                 }.onFailure { System.err.println("Presence: no StatusNotifier tray host; close will ask to quit."); if (System.getenv("PRESENCE_DEBUG") == "1") it.printStackTrace() }
@@ -54,8 +57,8 @@ fun main() {
                 icon = TrayIcon(image,"Presence").apply {
                     isImageAutoSize = true
                     val menu = PopupMenu()
-                    menu.add(MenuItem("Presence").apply { addActionListener { visible = true } })
-                    menu.add(MenuItem("Continue / Pause").apply { addActionListener { val s = app.center.snap(); if(s.status == "running") app.center.pause() else if(s.status == "paused") app.center.resume() else visible = true } })
+                    menu.add(MenuItem("Presence").apply { addActionListener { openMain() } })
+                    menu.add(MenuItem("Continue / Pause").apply { addActionListener { val s = app.center.snap(); if(s.status == "running") app.center.pause() else if(s.status == "paused") app.center.resume() else openMain() } })
                     menu.add(MenuItem("Stop").apply { addActionListener { app.center.stop() } })
                     val widgetMenu = Menu("Widgets")
                     listOf("timer" to "Timer", "stats" to "Statistics", "streak" to "Streak", "todos" to "Todos").forEach { (id,title) ->
@@ -63,9 +66,9 @@ fun main() {
                     }
                     menu.add(widgetMenu)
                     menu.addSeparator()
-                    menu.add(MenuItem("Quit Presence").apply { addActionListener { exiting = true; visible = true } })
+                    menu.add(MenuItem("Quit Presence").apply { addActionListener { exiting = true; openMain() } })
                     popupMenu = menu
-                    addActionListener { visible = true }
+                    addActionListener { openMain() }
                 }
                 runCatching { SystemTray.getSystemTray().add(icon); app.notifier.tray = icon; traySupported = true }.onFailure { icon = null }
             }
@@ -75,22 +78,23 @@ fun main() {
             val widgetState = rememberWindowState(width = 340.dp,height = 300.dp)
             Window(onCloseRequest = { widgets.remove(widget) },title = "Presence · $widget", icon = painterResource("presence.png"), state = widgetState, alwaysOnTop = true, undecorated = true) {
                 window.minimumSize = Dimension(280,240)
-                WindowDraggableArea(Modifier.fillMaxSize()) { WidgetContent(widget,app,open = { visible = true }, chrome = { PresenceWindowControls(widgetState, { widgets.remove(widget) }, compact = true) }) }
+                WindowDraggableArea(Modifier.fillMaxSize()) { WidgetContent(widget,app,open = { openMain() }, chrome = { PresenceWindowControls(widgetState, { widgets.remove(widget) }, compact = true) }) }
             }
         } }
-        val mainState = rememberWindowState(width = 1180.dp,height = 800.dp)
         val closeMain = { if(traySupported) visible = false else exiting = true }
         Window(onCloseRequest = closeMain, visible = visible, undecorated = true,
             title = "Presence", icon = painterResource("presence.png"), state = mainState,
             onKeyEvent = { event -> if(event.type == KeyEventType.KeyUp && event.key == Key.Escape && app.back != null) { app.back?.invoke(); true } else false }) {
             window.minimumSize = Dimension(700,560)
-            PresenceRoot(app, chrome = { PresenceWindowControls(mainState, closeMain) }, dragArea = { modifier, content -> WindowDraggableArea(modifier) { content() } })
+            PresenceRoot(app, chrome = { PresenceWindowControls(mainState, closeMain) }, dragArea = { modifier, content -> WindowDraggableArea(modifier) { content() } }, overlays = {
             if(exiting) {
                 val t = T(resolveLang(store.flag("language","system")))
                 AlertDialog(onDismissRequest = { exiting = false }, title = { Text("Quit Presence?") },
                     text = { Text("Timers, reminders and Wi-Fi sync keep working when you close to the tray. Quitting stops background activity until you open Presence again.") },
                     confirmButton = { TextButton(exit) { Text("Quit") } }, dismissButton = { TextButton({ exiting = false }) { Text(t.cancel) } })
             }
+            })
+            LaunchedEffect(openRequest) { if (visible) { window.toFront(); window.requestFocus() } }
             LaunchedEffect(Unit) {
                 val destination = System.getenv("PRESENCE_PREVIEW_DIR")
                 if(destination != null) {
