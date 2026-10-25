@@ -10,7 +10,6 @@ captures/
 *.aab
 .cxx/
 *.keystore
-!debug.keystore
 
 # Local screenshot and APK handoff artifacts
 /artifacts/ui-redesign/

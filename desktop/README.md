@@ -49,7 +49,7 @@ flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flath
 flatpak install --user flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 ./gradlew -PdesktopOnly :desktop:createDistributable
 flatpak-builder --user --force-clean --disable-rofiles-fuse --repo=flatpak-repo flatpak-build desktop/packaging/app.presence.Presence.yml
-flatpak build-bundle --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo flatpak-repo Presence-2.2.1-linux-x86_64.flatpak app.presence.Presence
+flatpak build-bundle --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo flatpak-repo Presence-1.1.1-linux-x86_64.flatpak app.presence.Presence
 ```
 
 The manifest composes metadata with `appstreamcli`, which the supported SDK provides. Flatpak has LAN access for Wi-Fi sync, display/GPU/sound access, and home/mounted-drive access for native file selection, backup and removable storage. App data defaults to its private XDG data directory.
@@ -61,3 +61,5 @@ Data persists by atomic replacement in `$XDG_DATA_HOME/presence` (default `~/.lo
 Desktop advertises `_presence._tcp.local.` with the same `id`, `nm`, and optional `code=offered` TXT records as Android. The secret code is never advertised. Codes expire after ten minutes or successful pairing. Paired devices sync every thirty seconds while Presence is running. Local appearance, language, reminders, todos and audio stay local; active sessions are protected. JSON backups use the Android format. The existing protocol is intended for trusted local networks.
 
 The Desktop release workflow tests the shared core and desktop storage, builds both installers, launches the packaged apps, and builds Flatpak. Manual workflow runs save artifacts; `desktop-v*` tags publish a prerelease after successful builds. Checksums accompany releases.
+
+Android release signing uses the existing external keystore (`PRESENCE_KEYSTORE`, or `~/.android/debug.keystore`) and checks its SHA-256 certificate before building. The key is never committed. The hosted workflow produces desktop artifacts; publish these together with the verified local Android APK and SHA256SUMS in one release.

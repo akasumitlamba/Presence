@@ -95,7 +95,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Exe, TargetFormat.Deb)
             packageName = "Presence"
-            packageVersion = "2.2.1"
+            packageVersion = "1.1.1"
             description = "Offline focus timer and time tracker"
             vendor = "Sumit Kumar"
             copyright = "Copyright 2026 Sumit Kumar"

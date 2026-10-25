@@ -105,4 +105,4 @@ The application bundles Source Sans 3 by Adobe under the SIL Open Font License. 
 
 ## Windows and Linux desktop preview
 
-Presence Desktop lives in [`desktop/`](desktop/README.md), sharing the Android timer and local Wi-Fi sync engine. It provides Windows `.exe`, Debian/Ubuntu `.deb`, and Linux `.flatpak` packages through the Desktop release workflow. See [desktop release notes](desktop/RELEASE_NOTES.md) for included features, installation, and preview limitations.
+Presence Desktop lives in [`desktop/`](desktop/README.md), sharing the Android timer and local Wi-Fi sync engine. It provides Windows `.exe`, Debian/Ubuntu `.deb`, and Linux `.flatpak` packages in the [same release as Android](https://github.com/akasumitlamba/Presence/releases/latest). See [desktop release notes](desktop/RELEASE_NOTES.md) for included features, installation, and preview limitations.
