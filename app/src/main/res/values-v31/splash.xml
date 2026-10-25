@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.Presence.Launch" parent="Theme.Presence">
+        <item name="android:windowSplashScreenBackground">@color/splash_surface</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_fg</item>
+    </style>
+</resources>

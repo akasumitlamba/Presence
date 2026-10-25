@@ -24,6 +24,7 @@ class StatsWidget : AppWidgetProvider() {
             val t = app.strings()
             val stats = app.focusStats()
             val views = RemoteViews(context.packageName, R.layout.widget_stats)
+            views.applyTheme(context, app, intArrayOf(R.id.stats_today), intArrayOf(R.id.stats_week), intArrayOf(R.id.stats_kicker), false)
             views.setTextViewText(R.id.stats_kicker, t.today)
             views.setTextViewText(R.id.stats_today, clockDigits(stats.today))
             views.setTextViewText(R.id.stats_week, t.week + " · " + clockDigits(stats.week))

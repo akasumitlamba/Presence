@@ -18,12 +18,14 @@ The APK is signed and can be installed without Play Store billing.
 Everything in Presence is free. There is no premium tier and no tester switch.
 
 - Work time split into equal stretches, with short and long breaks between them
-- Play, pause, resume, stop, and skip, plus free tracking, count-up display, and optional auto-continue
+- Continue, pause, stop, and skip, plus free tracking, count-up display, and optional auto-continue
 - Projects, tasks, and tags. A project is a name, and it can be deleted
 - A todo list: add, complete, and delete
 - A project goal and the daily target that shrinks as you log time
 - Today, week, month, and year, with a bar chart, a pie chart, and a month calendar
 - Sharing a stats summary and adding a past stretch by hand
+- Visible streak counters on Timer and Stats
+- First-launch instructions, replayable from Settings, and an app launch screen
 - The minimized timer bar
 - The ongoing notification with the time left
 - A daily reminder and a streak reminder, each with a time you set
@@ -95,3 +97,5 @@ Settings → Language. The first launch follows the phone when it is Turkish, Sp
 Copyright 2026 Sumit Kumar.
 
 Licensed under the Apache License, Version 2.0. You may obtain a copy of the license in [LICENSE](LICENSE), or at http://www.apache.org/licenses/LICENSE-2.0.
+
+All four home-screen widgets follow the selected palette and light/dark/system mode, including their icons, backgrounds, text, and timer action.

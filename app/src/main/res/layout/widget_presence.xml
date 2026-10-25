@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent">
+    <ImageView android:id="@+id/widget_background" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_bg" android:importantForAccessibility="no" />
+<LinearLayout
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_bg"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:padding="12dp">
 
     <ImageView
+        android:id="@+id/widget_icon"
         android:layout_width="28dp"
         android:layout_height="28dp"
         android:layout_marginEnd="10dp"
@@ -56,11 +57,12 @@
             android:textSize="13sp" />
     </LinearLayout>
 
+    <FrameLayout android:layout_width="104dp" android:layout_height="48dp">
+        <ImageView android:id="@+id/widget_action_background" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/widget_action_bg" android:scaleType="fitXY" android:importantForAccessibility="no" />
     <TextView
         android:id="@+id/widget_action"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/widget_action_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:fontFamily="@font/source_sans_3"
         android:gravity="center"
         android:minWidth="72dp"
@@ -70,4 +72,7 @@
         android:textColor="@color/widget_on_accent"
         android:textSize="15sp"
         android:textStyle="bold" />
+    </FrameLayout>
 </LinearLayout>
+
+</FrameLayout>

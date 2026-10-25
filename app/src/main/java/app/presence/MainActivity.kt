@@ -14,6 +14,7 @@ class MainActivity : ComponentActivity() {
     var requestedTab by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(app.presence.R.style.Theme_Presence)
         super.onCreate(savedInstanceState)
         requestedTab = if (savedInstanceState == null) intent?.getStringExtra(EXTRA_TAB) else null
         enableEdgeToEdge()

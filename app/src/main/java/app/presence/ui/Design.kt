@@ -31,6 +31,7 @@ internal data class UiLayout(val width: Dp = 360.dp, val height: Dp = 800.dp, va
     val twoPanes get() = width >= 900.dp && !short
     val margin get() = if (twoPanes) 24.dp else 16.dp
 }
+internal val LocalUiText = staticCompositionLocalOf { T("en") }
 internal val LocalUiLayout = staticCompositionLocalOf { UiLayout() }
 internal val DateSaver = Saver<LocalDate, Long>({ it.toEpochDay() }, { LocalDate.ofEpochDay(it) })
 internal val MonthSaver = Saver<YearMonth, String>({ it.toString() }, { YearMonth.parse(it) })
@@ -65,7 +66,10 @@ internal fun SectionCard(title: String? = null, modifier: Modifier = Modifier, s
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            if (title != null) Text(title, style = MaterialTheme.typography.titleLarge)
+            if (title != null) {
+                Text(title, style = MaterialTheme.typography.titleLarge)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
             content()
         }
     }

@@ -5,4 +5,7 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@color/paper</item>
     </style>
+    <style name="Theme.Presence.Launch" parent="Theme.Presence">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
 </resources>

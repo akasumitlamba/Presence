@@ -23,6 +23,7 @@ class StreakWidget : AppWidgetProvider() {
             val t = app.strings()
             val stats = app.focusStats()
             val views = RemoteViews(context.packageName, R.layout.widget_streak)
+            views.applyTheme(context, app, intArrayOf(R.id.streak_count), intArrayOf(R.id.streak_label), intArrayOf(), false)
             views.setTextViewText(R.id.streak_count, stats.streak.toString())
             views.setTextViewText(R.id.streak_label, t.streakLine(stats.streak, stats.logged))
             views.setOnClickPendingIntent(R.id.widget_root, openApp(context, 13, "stats"))

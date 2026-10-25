@@ -1,5 +1,8 @@
 package app.presence.widget
 
+import androidx.compose.ui.graphics.toArgb
+import app.presence.ui.presenceColorScheme
+import app.presence.R
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -52,5 +55,27 @@ object HomeWidgets {
         StatsWidget.update(context)
         StreakWidget.update(context)
         TodosWidget.update(context)
+    }
+}
+
+/** Widgets share the same palette and theme preference as the Compose app. */
+internal fun android.widget.RemoteViews.applyTheme(
+    context: Context, app: PresenceApp, text: IntArray, secondary: IntArray, accent: IntArray, timer: Boolean,
+) {
+    val flags = app.repo.flags()
+    val dark = when (flags["theme"]) {
+        "dark" -> true
+        "light" -> false
+        else -> context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
+    val colors = presenceColorScheme(dark, flags["palette"] ?: "grove")
+    setInt(R.id.widget_background, "setColorFilter", colors.surfaceContainer.toArgb())
+    setInt(R.id.widget_icon, "setColorFilter", colors.primary.toArgb())
+    text.forEach { setTextColor(it, colors.onSurface.toArgb()) }
+    secondary.forEach { setTextColor(it, colors.onSurfaceVariant.toArgb()) }
+    accent.forEach { setTextColor(it, colors.primary.toArgb()) }
+    if (timer) {
+        setInt(R.id.widget_action_background, "setColorFilter", colors.primary.toArgb())
+        setTextColor(R.id.widget_action, colors.onPrimary.toArgb())
     }
 }

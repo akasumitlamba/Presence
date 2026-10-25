@@ -2,6 +2,9 @@
 
 package app.presence.ui
 
+import androidx.compose.ui.semantics.liveRegion
+import app.presence.core.streakDays
+import app.presence.core.loggedToday
 import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
@@ -191,16 +194,22 @@ fun PresenceRoot() {
     val context = LocalContext.current
     val app = context.applicationContext as PresenceApp
     var ready by remember { mutableStateOf(app.ready.isCompleted) }
+    val startupFailed by app.startupFailed.collectAsState()
     LaunchedEffect(Unit) { app.ready.await(); ready = true }
     if (!ready) {
         PresenceTheme {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-                Text("Presence", style = MaterialTheme.typography.headlineMedium)
+                if (startupFailed) Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    val t = T(resolveLang("system"))
+                    Text(t.actionFailed, color = MaterialTheme.colorScheme.error)
+                    Button({ app.retryStartup() }) { Text(t.retry) }
+                } else StartupContent()
             }
         }
         return
     }
-    val rows by app.repo.observe().collectAsState(initial = emptyList())
+    val initialRows = remember(app.repo) { app.repo.snapshot() }
+    val rows by app.repo.observe().collectAsState(initial = initialRows)
     val flags = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.body.orEmpty()
     val configuration = LocalConfiguration.current
     val t = remember(flags["language"], configuration.locales.toLanguageTags()) { T(resolveLang(flags["language"] ?: "system")) }
@@ -210,13 +219,14 @@ fun PresenceRoot() {
         else -> androidx.compose.foundation.isSystemInDarkTheme()
     }
     val scale = when (flags["text"]) { "compact" -> 0.9f; "large" -> 1.16f; else -> 1f }
+    LaunchedEffect(flags) { withContext(Dispatchers.IO) { HomeWidgets.update(context) } }
     PresenceTheme(dark, flags["palette"] ?: "grove", scale) {
         // Background owns edge-to-edge drawing. Only this root owns system safe areas.
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             val systemInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
             BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(systemInsets).consumeWindowInsets(systemInsets)) {
                 val keyboard = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-                CompositionLocalProvider(LocalUiLayout provides UiLayout(maxWidth, maxHeight, keyboard)) {
+                CompositionLocalProvider(LocalUiLayout provides UiLayout(maxWidth, maxHeight, keyboard), LocalUiText provides t) {
                     Shell(app, rows, t, true, LocalUiLayout.current.twoPanes)
                 }
             }
@@ -228,10 +238,14 @@ fun PresenceRoot() {
 private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wide: Boolean) {
     val context = LocalContext.current
     val layout = LocalUiLayout.current
+    val storage by app.repo.storage().collectAsState()
     var tab by rememberSaveable { mutableStateOf("timer") }
     var projectId by rememberSaveable { mutableStateOf<String?>(null) }
     var pairing by rememberSaveable { mutableStateOf(false) }
     val stateHolder = rememberSaveableStateHolder()
+    val introPrefs = remember { context.getSharedPreferences("introduction", android.content.Context.MODE_PRIVATE) }
+    var guide by rememberSaveable { mutableStateOf(!introPrefs.getBoolean("completed", false)) }
+    if (guide) Introduction(t) { introPrefs.edit().putBoolean("completed", true).apply(); guide = false }
     val activity = context as? MainActivity
     val requested = activity?.requestedTab
     LaunchedEffect(requested) {
@@ -245,8 +259,8 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     val shown = displayMillis(snap, System.currentTimeMillis(), SystemClock.elapsedRealtime())
     if (tick < 0) return
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    LaunchedEffect(guide) {
+        if (!guide && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
     val back: (() -> Unit)? = when {
         pairing -> { { pairing = false } }
@@ -266,6 +280,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     val page: @Composable (Modifier) -> Unit = { modifier ->
         Column(modifier.imePadding()) {
             if (!(layout.short && layout.keyboard)) Box(Modifier.widthIn(max = 1200.dp).fillMaxWidth().align(Alignment.CenterHorizontally)) { PageHeader(title, t.back, back) }
+            if (storage.cardMissing) Text(t.sdMissing, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().clickable { tab = "settings"; pairing = false }.padding(horizontal = layout.margin, vertical = 8.dp))
             if (sessionOpen(snap) && tab != "timer" && !(layout.short && layout.keyboard)) {
                 Box(Modifier.widthIn(max = 1200.dp).fillMaxWidth().padding(horizontal = layout.margin, vertical = 4.dp).align(Alignment.CenterHorizontally)) {
                     Mini(t, snap, shown) { tab = "timer"; pairing = false }
@@ -293,8 +308,8 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
         bottomBar = {
             if (!layout.rail) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, windowInsets = WindowInsets(0)) {
                 destinations(t).forEach { item ->
-                    NavigationBarItem(selected = tab == item.id, onClick = { tab = item.id; pairing = false }, icon = { Icon(item.icon, null) },
-                        label = { Text(item.title, maxLines = 2, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelSmall) }, colors = presenceNavColors())
+                    NavigationBarItem(modifier = Modifier.semantics { contentDescription = item.title }, selected = tab == item.id, onClick = { tab = item.id; pairing = false }, icon = { Icon(item.icon, null) },
+                        label = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelSmall) }, colors = presenceNavColors())
                 }
             }
         },
@@ -369,6 +384,15 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
     var projectMenu by rememberSaveable { mutableStateOf(false) }
     var pending by rememberRecordState()
     val open = sessionOpen(snap)
+    var actionError by remember { mutableStateOf<String?>(null) }
+    fun act(action: () -> Unit) {
+        actionError = null
+        try { action() } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            android.util.Log.e("Presence", "Timer action failed", error)
+            actionError = t.actionFailed
+        }
+    }
     LaunchedEffect(snap.projectId, snap.taskId, projects.map { it.id }) {
         if (open) { selected = snap.projectId; taskId = snap.taskId }
         else if (projects.none { it.id == selected }) { selected = projects.firstOrNull()?.id; taskId = null }
@@ -405,64 +429,81 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             }
             if (open && snap.taskTitle.isNotBlank()) Text(snap.taskTitle, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PresenceButton(onClick = {
+                PresenceButton(onClick = { act {
                     when (snap.status) {
                         "running" -> app.center.pause()
                         "paused" -> app.center.resume()
                         "awaiting" -> app.center.start(snap.awaitingKind.ifBlank { "focus" }, project, task)
-                        else -> project?.let { app.center.start("focus", it, task) }
+                        else -> if (project != null) app.center.start("focus", project, task) else { actionError = t.needProject; creating = projects.isEmpty() }
                     }
-                }, enabled = open || project != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                    Icon(if (snap.status == "running") Icons.Outlined.Pause else Icons.Outlined.PlayArrow, null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp)); Text(if (snap.status == "running") t.pause else t.play)
+                } }, enabled = true, modifier = Modifier.weight(1.25f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                    Text(if (snap.status == "running") t.pause else t.play, maxLines = 2, textAlign = TextAlign.Center)
                 }
-                if (!open && project != null) TonalButton({ app.center.start("track", project, task) }, Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
-                if (open) TonalButton({ app.center.stop() }, Modifier.weight(1f).heightIn(min = 48.dp)) {
-                    Icon(Icons.Outlined.Stop, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(t.stop)
+                if (!open && project != null) TonalButton({ act { app.center.start("track", project, task) } }, Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
+                if (open) TonalButton({ act { app.center.stop() } }, Modifier.weight(1f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                    Text(t.stop)
                 }
-            }
-            if (snap.status in setOf("running", "paused") && snap.kind != "track") TextButton({ app.center.skip() }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Icon(Icons.Outlined.SkipNext, null); Spacer(Modifier.width(8.dp)); Text(t.skip)
+                if (snap.status in setOf("running", "paused") && snap.kind != "track") TonalButton({ act { app.center.skip() } }, Modifier.weight(1f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                    Text(t.skip, maxLines = 2)
+                }
             }
             if (snap.status == "awaiting") Text(t.waiting, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (!open && project == null) TonalButton({ creating = true }) { Text(t.newProject) }
+            if (!open && project == null) {
+                Text(t.needProject, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TonalButton({ creating = true }) { Text(t.newProject) }
+            }
+            actionError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Metric(t.loggedTime, if (spent < 60000) clockDigits(spent) else clockWords(spent))
                 Metric(t.pausesLabel, "${snap.pauseCount} · ${clockDigits(pauseNoteMillis(snap, System.currentTimeMillis()))}")
+                Metric(t.streak, streakDays(rows, System.currentTimeMillis(), ZoneId.systemDefault(), globals.dayStart).toString())
             }
             if (!androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize().padding(LocalUiLayout.current.margin)) {
         val columns = maxWidth >= 620.dp
-        val ringSize = if (columns) minOf(360.dp, maxHeight - 8.dp, maxWidth * 0.45f) else minOf(260.dp, maxWidth, maxHeight * 0.42f)
+        val ringSize = if (columns) minOf(360.dp, maxHeight - 8.dp, maxWidth * 0.45f) else minOf(320.dp, maxWidth, maxHeight * 0.5f)
         val ring: @Composable () -> Unit = {
-            Box(Modifier.size(ringSize), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size((ringSize - 28.dp).coerceAtLeast(120.dp)), contentAlignment = Alignment.Center) {
                 val accent = MaterialTheme.colorScheme.primary
                 val track = MaterialTheme.colorScheme.outlineVariant
                 val progress = if (open && snap.kind != "track" && snap.phaseMillis > 0 && snap.status != "awaiting") (worked.toFloat() / snap.phaseMillis).coerceIn(0f,1f) else 0f
                 Canvas(Modifier.fillMaxSize().padding(8.dp).semantics { contentDescription = "${phase(t, snap.kind)} ${clockDigits(face)}" }) {
-                    val stroke = Stroke(6.dp.toPx(), cap = StrokeCap.Round)
+                    val stroke = Stroke(12.dp.toPx(), cap = StrokeCap.Round)
                     drawArc(track, -90f, 360f, false, style = stroke)
                     if (progress > 0) drawArc(accent, -90f, progress * 360f, false, style = stroke)
-                    val markerSpace = (size.width * 0.4f) / stretches
-                    val radius = minOf(3.dp.toPx(), markerSpace * 0.3f)
-                    repeat(stretches) { index ->
-                        val done = open && index < snap.stretchIndex
-                        val current = open && index == snap.stretchIndex && snap.kind == "focus"
-                        drawCircle(if (done || current) accent else track, radius,
-                            Offset(size.width * 0.3f + markerSpace * (index + 0.5f), size.height * 0.88f))
-                    }
+
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
                     Text(if (snap.status == "idle") t.focus else phase(t, snap.kind), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(clockDigits(face), style = if (face >= 3_600_000L) MaterialTheme.typography.displaySmall else if (ringSize < 240.dp) MaterialTheme.typography.displayMedium else MaterialTheme.typography.displayLarge,
-                        maxLines = 1, softWrap = false)
+                    val digitBase = (if (face >= 3_600_000L) (ringSize.value * 0.17f).coerceIn(28f, 60f) else (ringSize.value * 0.23f).coerceIn(36f, 84f)).sp
+                    val digitStyle = MaterialTheme.typography.displayLarge.copy(fontSize = digitBase * (MaterialTheme.typography.displayLarge.fontSize.value / 56f))
+                    val measure = androidx.compose.ui.text.rememberTextMeasurer().measure(clockDigits(face), digitStyle, softWrap = false, maxLines = 1)
+                    val available = with(LocalDensity.current) { (ringSize - 88.dp).coerceAtLeast(70.dp).toPx() }
+                    val fit = minOf(1f, available / measure.size.width.coerceAtLeast(1))
+                    Text(clockDigits(face), style = digitStyle.copy(fontSize = digitStyle.fontSize * fit, lineHeight = digitStyle.fontSize * fit * 1.15f), maxLines = 1, softWrap = false)
                     if (snap.kind != "track") Text(t.cycleLine(if (open) (snap.stretchIndex + 1).coerceAtMost(stretches) else 1, stretches),
                         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (snap.status == "paused") Text(t.paused, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
+            }
+            if (snap.kind != "track") {
+                val accent = MaterialTheme.colorScheme.primary
+                val track = MaterialTheme.colorScheme.outlineVariant
+                Canvas(Modifier.width((ringSize - 40.dp).coerceAtLeast(100.dp)).height(20.dp).semantics { contentDescription = t.cycleLine(if (open) (snap.stretchIndex + 1).coerceAtMost(stretches) else 1, stretches) }) {
+                    val gap = minOf(6.dp.toPx(), size.width / (stretches * 3f))
+                    val bar = (size.width - gap * (stretches - 1)) / stretches
+                    repeat(stretches) { index ->
+                        val done = open && index < snap.stretchIndex
+                        val current = index == (if (open) snap.stretchIndex else 0)
+                        drawRoundRect(if (done || current) accent.copy(alpha = if (done) 1f else 0.6f) else track,
+                            Offset(index * (bar + gap), 7.dp.toPx()), androidx.compose.ui.geometry.Size(bar, 6.dp.toPx()), androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+                    }
+                }
+            }
             }
         }
         if (maxHeight < 180.dp) Column(Modifier.fillMaxSize().presenceScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -670,7 +711,7 @@ private fun ProjectDetail(
             SectionCard {
                 OutlinedTextField(name, { value -> name = value; if (value.isNotBlank()) saveProject(mapOf("name" to value.trim())) },
                     label = { Text(t.name) }, colors = presenceFieldColors(), modifier = Modifier.fillMaxWidth(), singleLine = true)
-
+                Text(t.savedAutomatically, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item(key = "goal") {
@@ -1055,6 +1096,9 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                 }
             }
         }
+        item(key = "streak") { SectionCard(t.streak) {
+            Text(t.streakLine(streakDays(rows, System.currentTimeMillis(), zone, dayStart), loggedToday(rows, System.currentTimeMillis(), zone, dayStart)), style = MaterialTheme.typography.titleMedium)
+        } }
         item(key = "actions") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton({ share() }) { Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text("${t.share} · ${listOf(t.today,t.week,t.month,t.year)[range]}") }
@@ -1354,6 +1398,7 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
     LaunchedEffect(Unit) { app.repo.refreshStorage() }
     val timerPane: @Composable () -> Unit = {
         SectionCard(t.timerDefaults) {
+            Text(t.savedAutomatically, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         PlanSections(
             t = t,
             workSec = globals.workMillis / 1000L,
@@ -1516,6 +1561,9 @@ private fun SettingsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boole
     val aboutPane: @Composable () -> Unit = { SectionCard(t.about) {
         Text("Presence", style = MaterialTheme.typography.titleMedium)
         Text(t.aboutBody, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        var help by rememberSaveable { mutableStateOf(false) }
+        TextButton({ help = true }) { Text(t.howTo) }
+        if (help) Introduction(t) { help = false }
         Text("Apache License 2.0", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     } }
     PresenceList(Modifier.fillMaxSize().padding(horizontal = LocalUiLayout.current.margin), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -1763,8 +1811,16 @@ private fun PresenceButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
+    val context = LocalContext.current
+    val failure = LocalUiText.current.actionFailed
     Button(
-        onClick = onClick,
+        onClick = {
+            try { onClick() } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                android.util.Log.e("Presence", "Action failed", error)
+                android.widget.Toast.makeText(context, failure, android.widget.Toast.LENGTH_LONG).show()
+            }
+        },
         modifier = modifier,
         enabled = enabled,
         contentPadding = contentPadding,
@@ -1783,8 +1839,16 @@ private fun TonalButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
+    val context = LocalContext.current
+    val failure = LocalUiText.current.actionFailed
     FilledTonalButton(
-        onClick = onClick,
+        onClick = {
+            try { onClick() } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                android.util.Log.e("Presence", "Action failed", error)
+                android.widget.Toast.makeText(context, failure, android.widget.Toast.LENGTH_LONG).show()
+            }
+        },
         modifier = modifier,
         enabled = enabled,
         shape = shape,

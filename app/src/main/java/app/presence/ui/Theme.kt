@@ -544,3 +544,6 @@ fun chartColor(hex: String, dark: Boolean): Color {
 }
 
 fun Color.isDark(): Boolean = luminance() < 0.45f
+
+/** Shared palette resolver for native widgets; no Compose runtime is required. */
+internal fun presenceColorScheme(dark: Boolean, palette: String) = scheme(dark, paletteOf(palette, dark))

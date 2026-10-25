@@ -36,6 +36,7 @@ class PresenceWidget : AppWidgetProvider() {
             val t = app.strings()
             val snap = app.center.snap()
             val views = RemoteViews(context.packageName, R.layout.widget_presence)
+            views.applyTheme(context, app, intArrayOf(R.id.widget_plain, R.id.widget_time), intArrayOf(R.id.widget_sub), intArrayOf(R.id.widget_kicker), true)
             views.setOnClickPendingIntent(R.id.widget_root, openApp(context, 11, "timer"))
             val phase = when (snap.kind) {
                 "short" -> t.shortRest
@@ -51,7 +52,7 @@ class PresenceWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_kicker, if (snap.status == "idle") t.focus else phase)
             views.setTextViewText(R.id.widget_sub, snap.projectName.ifBlank { t.unlabeled })
             views.setTextViewText(R.id.widget_action, label)
-            views.setOnClickPendingIntent(R.id.widget_action, serviceClick(context, action))
+            views.setOnClickPendingIntent(R.id.widget_action, if (snap.status == "idle") openApp(context, 15, "timer") else serviceClick(context, action))
             val nowE = System.currentTimeMillis()
             val nowL = SystemClock.elapsedRealtime()
             if (snap.status == "running" && snap.kind != "track" && !snap.countUp) {
