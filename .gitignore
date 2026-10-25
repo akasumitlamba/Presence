@@ -14,3 +14,9 @@ captures/
 
 # Local screenshot and APK handoff artifacts
 /artifacts/ui-redesign/
+
+# Local desktop previews and packaging workspace
+/artifacts/desktop-preview*/
+/flatpak-build/
+/flatpak-repo/
+/.flatpak-builder/

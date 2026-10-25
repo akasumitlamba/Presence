@@ -24,13 +24,15 @@ class DesktopLan(private val store: Store) : AutoCloseable {
             try {
                 refreshInterfaces()
                 val offered = node.offerCode
-                if (offered != null && System.currentTimeMillis() >= node.offerUntil) node.retireOffer()
+                if (offered != null && System.currentTimeMillis() >= node.offerUntil) { node.retireOffer(); message = "expired" }
+                else if(code != null && offered == null) message = "Paired. Data synced."
                 code = node.offerCode
                 if (advertised != code) advertise()
             } catch (e: Exception) { message = "Local discovery unavailable: ${e.message}. Try an address below." }
         }, 0, 2, TimeUnit.SECONDS)
         worker.scheduleWithFixedDelay({ syncKnown() }, 8, 30, TimeUnit.SECONDS)
     }
+    fun offerUntil() = node.offerUntil
     fun peers() = discoveries.values.distinctBy { it.id }.sortedBy { it.name }
     fun address() = "${interfaces.keys.firstOrNull()?.hostAddress ?: "127.0.0.1"}:${node.port}"
     private fun refreshInterfaces() {
@@ -86,11 +88,12 @@ class DesktopLan(private val store: Store) : AutoCloseable {
         }
         message = if (result.ok) "Paired with ${result.peerName}. Data synced." else "Pairing failed: ${result.reason}"
     }
-    fun sync() = execute { syncKnown() }
-    private fun syncKnown() {
+    fun sync(peerId: String? = null) = execute { syncKnown(peerId) }
+    private fun syncKnown(peerId: String? = null) {
         if (closed) return
-        peers().filter { store.tokenFor(it.id) != null }.forEach {
+        peers().filter { store.tokenFor(it.id) != null && (peerId == null || it.id == peerId) }.forEach {
             val result = node.sync(it.host, it.port, it.id)
+            if(result.ok) store.touchPeer(it.id)
             message = if (result.ok) "Synced with ${it.name}" else "Could not sync with ${it.name}: ${result.reason}"
         }
     }

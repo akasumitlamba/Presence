@@ -1,14 +1,20 @@
-First desktop preview of Presence for Windows and Linux. Every feature is free; there are no paid plans.
+Presence Desktop 2.2.1 for Windows and Linux. Every feature is free; there are no paid plans.
 
-- Windows .exe installer, Debian/Ubuntu .deb package, and Linux .flatpak bundle; Java is included.
-- Android's eleven light/dark palettes and Source Sans 3 typography, with desktop navigation and resizable layouts.
-- Focus timers, stopwatch tracking, pause/resume/stop/skip, projects, tasks, goals/deadlines, local todos, statistics, CSV export and JSON backup import/export.
-- Local Wi-Fi pairing and automatic sync using the same Kotlin protocol and merge engine as Android 2.2.1. DNS-SD discovery supports Wi-Fi and Ethernet. Appearance and todos stay local; active sessions are protected.
+- Windows `.exe` installer, Debian/Ubuntu `.deb`, and Linux `.flatpak` bundle, with Java included.
+- UI and timer controls built directly from Android's source, including its eleven palettes, seven languages, text sizes and introduction.
+- Projects, ordering, tasks, tags and filters, goals/deadlines and daily targets; local todos.
+- Focus timers and time tracking, per-project work/break settings, pause/resume/stop/skip, count-up and automatic continuation.
+- Calendar statistics, day/week/month/year periods, charts, streaks, validated manual entries and sharing.
+- Same alarm tones, rain/brook/hearth ambience, volume control and custom audio.
+- Daily and streak reminders, close-to-tray background operation and four floating desktop widgets.
+- Android-compatible Wi-Fi pairing and automatic sync; JSON import/export, CSV export and optional storage on a mounted removable drive.
 
-Install one package for your platform. For Flatpak use `flatpak install --user ./Presence-2.2.1-linux-x86_64.flatpak`.
+Install one package for your platform. For Flatpak:
 
-This is a prerelease. Automated tests cover pairing, bidirectional sync, deletion, timer protection and persistence. Physical Android/Windows/Linux Wi-Fi interoperability still needs device testing. Desktop currently uses English and a system completion beep; Android widgets, reminders and custom ambient audio are not included. Presence must remain open for automatic sync and completion alerts; timer state recovers after reopening.
+`flatpak install --user ./Presence-2.2.1-linux-x86_64.flatpak`
 
-On Windows allow Presence on private networks if prompted. Discovery uses UDP 5353, and sync uses a dynamically allocated TCP port. Both devices must be on the same LAN; guest-network isolation can prevent discovery. Desktop-to-desktop pairing also supports entering the displayed IPv4 address and port.
+Connect devices to the same local network. Allow Presence on private networks in Windows Firewall if prompted. Discovery uses UDP 5353 and sync uses a dynamically allocated TCP port. Guest-network isolation can block communication.
 
-Installers are unsigned. Verify downloads against SHA256SUMS.
+Closing to the tray keeps timers, reminders and sync running. Explicitly quitting stops background activity until reopening; saved timers recover. Home-screen widgets are provided as floating desktop windows, and platform file/date/share dialogs use desktop equivalents.
+
+This first desktop release is a prerelease. Automated protocol/storage/timer tests, local mDNS pairing and packaged launch checks cover the implementation. Physical Android-to-PC Wi-Fi, suspend/resume and hardware audio/notification testing remain to be completed. Installers are unsigned; checksums are in `SHA256SUMS`.

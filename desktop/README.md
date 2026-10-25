@@ -1,22 +1,46 @@
 # Presence Desktop
 
-Desktop module in the same repository as Android. Kotlin/JVM and Compose Desktop reuse `:core` for timing, statistics, backup format, pairing and merge rules. `Theme.kt` is adapted from Android's palette and typography source; preserve parity when changing themes.
+Windows and Linux versions of the Android app, in the same repository. Every feature is free.
 
-Design: the Android Grove palette (#0E5C42 primary, #F3F6F4 background, #FFFFFF surface, #10241C text, #C9EBDD selection), Source Sans 3, a left navigation rail, centered timer ring, and left-aligned project/statistics views. All eleven original palettes are included. Desktop controls use the same Material shapes and sizing system; wide windows provide reading space without stretching the timer.
+## Android parity
+
+The build adapts the **actual Android source**, rather than maintaining separate desktop screens:
+
+- `Screens.kt`: timer, projects, tasks, tags, goals, todos, statistics, calendar, manual entries, sharing, settings and Wi-Fi pairing.
+- `Design.kt`, `Theme.kt`: the same Material controls, eleven palettes, light/dark/system appearance, spacing, typography and text sizes.
+- `L10n.kt`, `Introduction.kt`: the same seven languages and introduction.
+- `timer/Center.kt`: the same timer commands, plans, pause accounting, transitions and active-plan protection.
+- `:core`: identical timing, statistics, backup records, LAN protocol and merge logic.
+- Fonts and icon are loaded from Android/repository assets at build time.
+
+`tools/adapt_android_ui.py` only replaces platform integrations: Android permissions, file/share pickers, date/time dialogs, notifications and storage access. Its source anchors fail the build if an Android integration changes unexpectedly. Generated Kotlin is under `desktop/build/generated/androidUi` and is not committed.
+
+Desktop equivalents of Android system features:
+
+| Android | Desktop |
+| --- | --- |
+| Foreground timer service | Independent background timer worker; close to system tray |
+| Notifications and reminders | Tray notifications; daily and streak reminders |
+| Four home-screen widgets | Four floating widgets from Settings → Storage or tray → Widgets |
+| Android document/share chooser | Desktop file chooser; copy or save shared summaries |
+| Removable-card database | Choose an empty data folder on a mounted removable drive |
+| AudioTrack and MediaPlayer | Same generated PCM tones and ambient loops via Java Sound; custom audio decoders |
+
+Quitting the app explicitly stops background work until it is opened again. Timers recover their saved state after reopening. A system tray is required for closing the main window while leaving the app running; floating widgets can also be opened from Settings. Hardware sleep/wake, notifications and router/firewall behavior still require testing on physical devices.
 
 ## Build
 
-Use JDK 17. Android SDK is unnecessary with `-PdesktopOnly`.
+Use JDK 17 and Python 3. No Android SDK is needed with `-PdesktopOnly`. Python is a build dependency; installed apps bundle Java and do not require Python or Java to be installed separately.
 
 ```sh
 ./gradlew -PdesktopOnly :core:test :desktop:test
 ./gradlew -PdesktopOnly :desktop:run
 ./gradlew -PdesktopOnly :desktop:packageDeb :desktop:createDistributable
-# On Windows with JDK 17 and WiX 3 installed:
+# On Windows with WiX 3 installed:
 ./gradlew -PdesktopOnly :desktop:packageExe
 ```
 
-Compose uses jpackage; build Windows installers on Windows and Debian packages on Linux. Outputs are in `desktop/build/compose/binaries/main/`. The Desktop release workflow builds both platforms and Flatpak, tests the Linux launcher, and publishes assets with checksums for `desktop-v*` tags. Manual workflow runs produce downloadable artifacts without publishing.
+Build Windows installers on Windows and Debian packages on Linux. Outputs are under `desktop/build/compose/binaries/main/`.
 
 ## Flatpak
 
@@ -28,14 +52,12 @@ flatpak-builder --user --force-clean --disable-rofiles-fuse --repo=flatpak-repo 
 flatpak build-bundle flatpak-repo Presence-2.2.1-linux-x86_64.flatpak app.presence.Presence
 ```
 
-Flatpak has LAN access for mDNS and TCP sync, display/GPU and sound access. Data stays in its private XDG data directory. Backups use the native file chooser. The Documents folder is accessible for backup import/export; other host folders stay private.
+The manifest composes metadata with `appstreamcli`, which the supported SDK provides. Flatpak has LAN access for Wi-Fi sync, display/GPU/sound access, and home/mounted-drive access for native file selection, backup and removable storage. App data defaults to its private XDG data directory.
 
 ## Data and sync
 
-Records persist using atomic replacement in `$XDG_DATA_HOME/presence` (default `~/.local/share/presence`), `%APPDATA%/presence` on Windows, or Flatpak's private XDG directory. Keep the entire data file private: it contains pairing tokens. A process lock prevents simultaneous instances. A corrupt data file is reported and never silently reset.
+Data persists by atomic replacement in `$XDG_DATA_HOME/presence` (default `~/.local/share/presence`) or `%APPDATA%/presence` on Windows. A process lock prevents concurrent instances. A corrupt file is reported rather than reset. Storage relocation verifies the new copy before switching and retains the previous file for recovery. Reconnect a selected removable drive before reopening the app.
 
-Desktop advertises `_presence._tcp.local.` with Android-compatible `id`, `nm`, and optional `code=offered` TXT fields. The secret four-digit code is never advertised. Pairing codes are valid for ten minutes, then retire. Paired peers exchange records every thirty seconds while the app is open. Completed sessions, projects, tasks, tags and timer preferences sync. Local settings and todos do not. Network traffic uses the existing Android LAN protocol; this is intended for trusted local networks.
+Desktop advertises `_presence._tcp.local.` with the same `id`, `nm`, and optional `code=offered` TXT records as Android. The secret code is never advertised. Codes expire after ten minutes or successful pairing. Paired devices sync every thirty seconds while Presence is running. Local appearance, language, reminders, todos and audio stay local; active sessions are protected. JSON backups use the Android format. The existing protocol is intended for trusted local networks.
 
-Automated tests use the actual `Node` server/client with Android's in-memory Catalog and a persistent desktop Catalog. Physical device testing remains necessary for firewall, router, interface and suspend behavior.
-
-See [release notes](RELEASE_NOTES.md) for preview limitations. Font licenses remain in `third_party/source-sans-3`.
+The Desktop release workflow tests the shared core and desktop storage, builds both installers, launches the packaged apps, and builds Flatpak. Manual workflow runs save artifacts; `desktop-v*` tags publish a prerelease after successful builds. Checksums accompany releases.

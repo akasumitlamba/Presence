@@ -60,6 +60,47 @@ class DesktopTest {
         DesktopTimer(reopened).start("focus",null,null)
         assertEquals("running",reopened.snap().status)
     }
+    @Test fun movingStoragePreservesIdentityPeersAndTimerWithoutOverwritingExistingData() {
+        val a = store()
+        val id = a.deviceId()
+        a.rememberPeer("phone","Phone","token")
+        DesktopTimer(a).start("track",null,null)
+        val target = Files.createTempDirectory("presence-removable")
+        a.relocate(target,rememberLocation = false)
+        assertEquals(id,Store(target).deviceId())
+        assertEquals("token",Store(target).tokenFor("phone"))
+        assertEquals("running",Store(target).snap().status)
+        val other = store()
+        val original = other.directory
+        try { other.relocate(target,rememberLocation = false); fail("Existing data must not be overwritten") }
+        catch(_: IllegalArgumentException) { assertEquals(original,other.directory) }
+        assertEquals(id,Store(target).deviceId())
+    }
+    @Test fun backupImportRestoresLocalPreferencesButDoesNotClaimMissingCustomAudio() {
+        val a = store()
+        a.setPref("daily_on","1")
+        a.setPref("alarm","custom")
+        val b = store()
+        b.mergeFrom(decodeBackup(encodeBackup(a.snapshot()))!!)
+        assertTrue(b.globals().dailyOn)
+        assertEquals("chime",b.globals().alarm)
+    }
+    @Test fun projectPlanAndGlobalDefaultsMatchAndroidAndRemainFixedWhileRunning() {
+        val a = store()
+        a.setPref("work_sec","3600")
+        val project = Rec(KIND_PROJECT,"p",1,"a",false,mapOf("name" to "Work", "workSec" to "1800","shortCount" to "1","longCount" to "0"))
+        a.put(project)
+        val center = TimerCenter(a) { }
+        center.start("focus",project,null)
+        assertEquals(900000L,a.snap().phaseMillis)
+        a.setPref("work_sec","7200")
+        center.refreshSettings()
+        assertEquals(1800000L,a.snap().workMillis)
+        center.pause()
+        assertEquals("paused",a.snap().status)
+        center.resume()
+        assertEquals("running",a.snap().status)
+    }
     @Test fun incompleteSessionsAreExcludedAndBackupsRemainAndroidCompatible() {
         val a = store()
         DesktopTimer(a).start("track", null, null)
@@ -67,7 +108,7 @@ class DesktopTest {
         assertTrue(records.any { it.kind == KIND_SESSION })
         assertTrue(records.forSync().none { it.kind == KIND_SESSION })
         val b = store()
-        b.mergeFrom(records)
+        b.mergeFrom(records.forSync())
         assertTrue(b.snapshot().alive(KIND_SESSION).isEmpty())
         assertNotEquals(a.deviceId(), b.deviceId())
     }
