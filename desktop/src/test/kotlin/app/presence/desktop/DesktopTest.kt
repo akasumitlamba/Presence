@@ -7,6 +7,21 @@ import java.nio.file.Files
 
 class DesktopTest {
     private fun store() = Store(Files.createTempDirectory("presence-test"))
+    @Test(timeout = 15000) fun customAudioDecodesCommonAndroidFormatsWithoutAnAudioDevice() {
+        for(extension in listOf("wav","mp3","ogg","m4a","flac")) {
+            val file = Files.createTempFile("presence-audio-", ".pending")
+            javaClass.getResourceAsStream("/audio/tone.$extension")!!.use { Files.copy(it,file,java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
+            try {
+                validateCustomAudio(file.toFile())
+                decodedAudio(file.toFile()).use {
+                    val bytes = it.readAllBytes().size
+                    val seconds = bytes / (it.format.frameSize * it.format.sampleRate)
+                    assertTrue("Incorrect $extension duration: $seconds",seconds in 0.8f..1.3f)
+                }
+            } catch(e: Exception) { throw AssertionError("Could not decode $extension",e) }
+            finally { Files.deleteIfExists(file) }
+        }
+    }
     @Test fun persistsIdentityRecordsAndPairingCredentials() {
         val a = store()
         a.write(KIND_PROJECT, "project", mapOf("name" to "Research", "goalMinutes" to "120", "goalDeadline" to "99999"))

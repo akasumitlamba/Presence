@@ -26,7 +26,9 @@ import java.time.ZoneId
                     "timer" -> {
                         val s = app.center.snap()
                         Text(s.projectName.ifBlank { "Presence" },style = MaterialTheme.typography.titleLarge)
-                        Text(clockDigits(displayMillis(s,System.currentTimeMillis(),monotonicMillis())),style = MaterialTheme.typography.displayMedium)
+                        val g = app.repo.globals()
+                        val shown = if(s.status == "idle") { if(g.countUp) 0L else stretchLengths(g.workMillis,stretchCount(g.shortCount,g.longCount)).first() } else displayMillis(s,System.currentTimeMillis(),monotonicMillis())
+                        Text(clockDigits(shown),style = MaterialTheme.typography.displayMedium)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button({ when(s.status) { "running" -> app.center.pause(); "paused" -> app.center.resume(); "awaiting" -> app.center.start(s.awaitingKind,null,null); else -> open() } }) { Text(if(s.status == "running") t.pause else t.play) }
                             TextButton({ app.center.stop() }, enabled = sessionOpen(s)) { Text(t.stop) }
@@ -37,7 +39,7 @@ import java.time.ZoneId
                         val zone = ZoneId.systemDefault(); val hour = app.repo.globals().dayStart
                         val today = dayKey(System.currentTimeMillis(),zone,hour)
                         Text(clockWords(dayTotals(rows,listOf(today),zone,hour).single()),style = MaterialTheme.typography.displayMedium)
-                        Text(t.onlyFocus)
+                        Text(t.week + " · " + clockDigits(dayTotals(rows,(0..6).map { today.minusDays(it.toLong()) },zone,hour).sum()))
                     }
                     "streak" -> {
                         val zone = ZoneId.systemDefault(); val hour = app.repo.globals().dayStart

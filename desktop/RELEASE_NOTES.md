@@ -17,4 +17,4 @@ Connect devices to the same local network. Allow Presence on private networks in
 
 Closing to the tray keeps timers, reminders and sync running. Explicitly quitting stops background activity until reopening; saved timers recover. Home-screen widgets are provided as floating desktop windows, and platform file/date/share dialogs use desktop equivalents.
 
-This first desktop release is a prerelease. Automated protocol/storage/timer tests, local mDNS pairing and packaged launch checks cover the implementation. Physical Android-to-PC Wi-Fi, suspend/resume and hardware audio/notification testing remain to be completed. Installers are unsigned; checksums are in `SHA256SUMS`.
+This first desktop release is a prerelease. Automated protocol/storage/timer/audio tests, local mDNS pairing and packaged launch checks cover the implementation. Physical Android-to-PC Wi-Fi, suspend/resume and hardware audio/notification testing remain to be completed. Installers are unsigned; checksums are in `SHA256SUMS`.

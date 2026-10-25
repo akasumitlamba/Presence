@@ -104,15 +104,36 @@ class PresenceApp(val repo: Store) : AutoCloseable {
 }
 
 fun decodedAudio(file: java.io.File): AudioInputStream {
-    val source = AudioSystem.getAudioInputStream(file)
+    var source = AudioSystem.getAudioInputStream(file)
     try {
         val format = source.format
+        if(format.encoding.toString().contains("VORBIS",ignoreCase = true)) {
+            source.close()
+            // Let the Vorbis SPI drain a short file's final buffered page before reaching EOF.
+            val encoded = java.io.SequenceInputStream(Files.newInputStream(file.toPath()),ByteArrayInputStream(ByteArray(8192)))
+            source = AudioInputStream(encoded,format,AudioSystem.NOT_SPECIFIED.toLong())
+        }
+        if(format.encoding == AudioFormat.Encoding.PCM_SIGNED && format.sampleSizeInBits == 16) return source
         val pcm = AudioFormat(AudioFormat.Encoding.PCM_SIGNED,format.sampleRate,16,format.channels,format.channels*2,format.sampleRate,false)
-        return AudioSystem.getAudioInputStream(pcm,source)
+        val bigEndian = AudioFormat(AudioFormat.Encoding.PCM_SIGNED,format.sampleRate,16,format.channels,format.channels*2,format.sampleRate,true)
+        val codecFormat = when {
+            AudioSystem.isConversionSupported(pcm,format) -> pcm
+            AudioSystem.isConversionSupported(bigEndian,format) -> bigEndian
+            else -> throw UnsupportedAudioFileException("No PCM decoder for $format")
+        }
+        val decoded = AudioSystem.getAudioInputStream(codecFormat,source)
+        return if(codecFormat.matches(pcm)) decoded else AudioSystem.getAudioInputStream(pcm,decoded)
     } catch(e: Exception) { source.close(); throw e }
 }
 fun validateCustomAudio(file: java.io.File) {
-    decodedAudio(file).use { stream -> require(stream.read(ByteArray(4096)) > 0) { "The audio file is empty or unsupported" } }
+    decodedAudio(file).use { stream ->
+        val buffer = ByteArray(4096)
+        val deadline = System.nanoTime() + 5_000_000_000L
+        var read = stream.read(buffer)
+        // Some asynchronous Java Sound providers return zero before their first decoded frame.
+        while(read == 0 && System.nanoTime() < deadline) { Thread.yield(); read = stream.read(buffer) }
+        require(read > 0) { "The audio file is empty or unsupported" }
+    }
 }
 
 fun replaceCustomAudio(pending: java.io.File, target: java.io.File): Boolean {

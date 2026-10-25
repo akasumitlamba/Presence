@@ -77,7 +77,7 @@ dependencies {
     implementation("com.tianscar.javasound:javasound-aac:0.9.8")
     implementation("com.tianscar.javasound:javasound-flac:1.4.1")
     implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
-    implementation("com.googlecode.soundlibs:vorbisspi:1.0.3.3")
+    implementation("com.github.trilarion:java-vorbis-support:1.2.1")
     implementation("org.json:json:20240303")
     implementation("org.jmdns:jmdns:3.6.1")
     implementation("org.slf4j:slf4j-nop:2.0.16")
