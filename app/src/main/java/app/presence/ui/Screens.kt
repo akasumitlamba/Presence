@@ -239,6 +239,8 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     val context = LocalContext.current
     val layout = LocalUiLayout.current
     val storage by app.repo.storage().collectAsState()
+    var fullScreen by rememberSaveable { mutableStateOf(false) }
+    TimerImmersive(fullScreen)
     var tab by rememberSaveable { mutableStateOf("timer") }
     var projectId by rememberSaveable { mutableStateOf<String?>(null) }
     var pairing by rememberSaveable { mutableStateOf(false) }
@@ -249,7 +251,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     val activity = context as? MainActivity
     val requested = activity?.requestedTab
     LaunchedEffect(requested) {
-        if (!requested.isNullOrEmpty()) { tab = requested; pairing = false; activity?.requestedTab = null }
+        if (!requested.isNullOrEmpty()) { fullScreen = false; tab = requested; pairing = false; activity?.requestedTab = null }
     }
     var tick by rememberSaveable { mutableIntStateOf(0) }
     val snap = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "snapshot" && !it.deleted }?.let { snapFrom(it.body) } ?: Snap()
@@ -263,6 +265,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
         if (!guide && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
     val back: (() -> Unit)? = when {
+        fullScreen -> { { fullScreen = false } }
         pairing -> { { pairing = false } }
         tab == "projects" && projectId != null && !wide -> { { projectId = null } }
         else -> null
@@ -279,7 +282,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
     }
     val page: @Composable (Modifier) -> Unit = { modifier ->
         Column(modifier.imePadding()) {
-            if (!(layout.short && layout.keyboard)) Box(Modifier.widthIn(max = 1200.dp).fillMaxWidth().align(Alignment.CenterHorizontally)) { PageHeader(title, t.back, back) }
+            if (!fullScreen && !(layout.short && layout.keyboard)) Box(Modifier.widthIn(max = 1200.dp).fillMaxWidth().align(Alignment.CenterHorizontally)) { PageHeader(title, t.back, back) }
             if (storage.cardMissing) Text(t.sdMissing, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().clickable { tab = "settings"; pairing = false }.padding(horizontal = layout.margin, vertical = 8.dp))
             if (sessionOpen(snap) && tab != "timer" && !(layout.short && layout.keyboard)) {
                 Box(Modifier.widthIn(max = 1200.dp).fillMaxWidth().padding(horizontal = layout.margin, vertical = 4.dp).align(Alignment.CenterHorizontally)) {
@@ -290,7 +293,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
                 stateHolder.SaveableStateProvider(if (pairing) "pairing" else tab) {
                     when {
                         pairing -> PairPage(app, t, rows)
-                        tab == "timer" -> TimerPage(app, t, rows, premium, wide, snap, shown) { }
+                        tab == "timer" -> TimerPage(app, t, rows, premium, wide, snap, shown, fullScreen, { fullScreen = !fullScreen }) { }
                         tab == "projects" -> ProjectsPage(app, t, rows, premium, wide, projectId, { projectId = it }) { }
                         tab == "todos" -> TodosPage(app, t, rows, wide)
                         tab == "stats" -> StatsPage(app, t, rows, premium, wide, snap) { }
@@ -306,7 +309,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
-            if (!layout.rail) Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow), contentAlignment = Alignment.Center) {
+            if (!fullScreen && !layout.rail) Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow), contentAlignment = Alignment.Center) {
                 NavigationBar(modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceContainerLow, windowInsets = WindowInsets(0)) {
                     destinations(t).forEach { item ->
                         NavigationBarItem(modifier = Modifier.semantics { contentDescription = item.title }, selected = tab == item.id, onClick = { tab = item.id; pairing = false }, icon = { Icon(item.icon, null) },
@@ -317,7 +320,7 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
         },
     ) { padding ->
         Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-            if (layout.rail) Rail(t, tab) { tab = it; pairing = false }
+            if (!fullScreen && layout.rail) Rail(t, tab) { tab = it; pairing = false }
             page(Modifier.weight(1f).fillMaxHeight())
         }
     }
@@ -379,7 +382,7 @@ private fun phase(t: T, kind: String) = when (kind) {
 }
 
 @Composable
-private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, snap: Snap, shown: Long, onGate: () -> Unit) {
+private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, snap: Snap, shown: Long, immersive: Boolean, onFullscreen: () -> Unit, onGate: () -> Unit) {
     val context = LocalContext.current
     val projects = rows.alive(KIND_PROJECT).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
     var selected by rememberSaveable { mutableStateOf(snap.projectId) }
@@ -415,6 +418,7 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
     val spent = logged + if (snap.status in setOf("running", "paused") && snap.kind in setOf("focus", "track")) worked else 0L
     val controls: @Composable () -> Unit = {
         SectionCard(spacing = 8.dp) {
+            if (!immersive) {
             Box {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text(t.projects, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -440,6 +444,10 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                 taskId = if (taskId == id) null else id
             }
             if (open && snap.taskTitle.isNotBlank()) Text(snap.taskTitle, style = MaterialTheme.typography.bodyMedium)
+            } else {
+                Text(project?.f("name") ?: snap.projectName.ifBlank { t.chooseProject }, Modifier.fillMaxWidth(), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleLarge)
+                if (open && snap.taskTitle.isNotBlank()) Text(snap.taskTitle, Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PresenceButton(onClick = { act {
                     when (snap.status) {
@@ -465,16 +473,18 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                 TonalButton({ creating = true }) { Text(t.newProject) }
             }
             actionError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }) }
+            if (!immersive) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Metric(t.loggedTime, if (spent < 60000) clockDigits(spent) else clockWords(spent), Modifier.weight(1f), centered = true)
                 Metric(t.pausesLabel, "${snap.pauseCount} · ${clockDigits(pauseNoteMillis(snap, System.currentTimeMillis()))}", Modifier.weight(1f), centered = true)
                 Metric(t.streak, streakDays(rows, System.currentTimeMillis(), ZoneId.systemDefault(), globals.dayStart).toString(), Modifier.weight(1f), centered = true)
             }
-            if (!androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (!immersive && !androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
         }
     }
-    BoxWithConstraints(Modifier.fillMaxSize().padding(LocalUiLayout.current.margin)) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(LocalUiLayout.current.margin).padding(bottom = 48.dp)) {
         val columns = maxWidth >= 620.dp
         val ringSize = if (columns) minOf(360.dp, maxHeight - 8.dp, maxWidth * 0.45f) else minOf(320.dp, maxWidth, maxHeight * 0.5f)
         val ring: @Composable () -> Unit = {
@@ -524,8 +534,11 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         } else if (columns) Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { ring() }
             Column(Modifier.weight(1f).widthIn(max = 440.dp).presenceScroll(rememberScrollState())) { controls() }
-        } else Column(Modifier.fillMaxSize().presenceScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        } else Column(Modifier.fillMaxSize().presenceScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, if (immersive) Alignment.CenterVertically else Alignment.Top)) {
             ring(); controls(); Spacer(Modifier.height(8.dp))
+        }
+        IconButton(onFullscreen, Modifier.align(Alignment.BottomEnd).offset(y = 48.dp)) {
+            Icon(if (immersive) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen, if (immersive) t.exitFullscreen else t.fullscreen)
         }
     }
     pending?.let { item -> Confirm(t.switchTitle, t.switchBody, t.save, t.cancel, {

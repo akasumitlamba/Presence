@@ -93,3 +93,6 @@ class DesktopTimePicker(private val context: DesktopContext, private val chosen:
         Row { listOf("timer" to t.timer,"stats" to t.stats,"streak" to t.streak,"todos" to t.todos).forEach { (id,label) -> TextButton({ app.openWidget?.invoke(id) }) { Text(label) } } }
     }
 }
+
+// Desktop fullscreen hides app navigation; it does not alter Android system bars.
+@androidx.compose.runtime.Composable internal fun TimerImmersive(enabled: Boolean) {}

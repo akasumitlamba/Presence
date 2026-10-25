@@ -13,14 +13,16 @@ import kotlinx.coroutines.delay
 import java.time.ZoneId
 
 /** Desktop equivalents of Android's four home-screen widgets, sharing the same records. */
-@Composable fun WidgetContent(kind: String, app: PresenceApp, open: () -> Unit) {
+@Composable fun WidgetContent(kind: String, app: PresenceApp, open: () -> Unit, chrome: @Composable () -> Unit = {}) {
     val rows by app.repo.observe().collectAsState()
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while(true) { delay(250); tick++ } }
     val t = T(resolveLang(app.repo.flag("language","system")))
     val dark = when(app.repo.flag("theme","system")) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
     PresenceTheme(dark,app.repo.flag("palette","grove")) {
-        Surface {
+        Column(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalUiText provides t) { chrome() }
+        Surface(Modifier.weight(1f)) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when(kind) {
                     "timer" -> {
@@ -61,6 +63,7 @@ import java.time.ZoneId
                 TextButton(open) { Text("Presence") }
                 if(tick < 0) Text("")
             }
+        }
         }
     }
 }

@@ -20,18 +20,21 @@ s='\n'.join(line for line in s.split('\n') if not line.startswith((
     'import androidx.compose.ui.platform.LocalContext', 'import app.presence.MainActivity',
     'import app.presence.PresenceApp', 'import app.presence.data.', 'import app.presence.timer.', 'import app.presence.widget.')))
 s=section(s,'@Composable\nfun PresenceRoot()', '@Composable\nprivate fun Shell(', '''@Composable
-fun PresenceRoot(app: PresenceApp) {
+fun PresenceRoot(app: PresenceApp, chrome: @Composable () -> Unit = {}) {
     val rows by app.repo.observe().collectAsState(initial = app.repo.snapshot())
     val flags = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.body.orEmpty()
     val t = remember(flags["language"]) { T(resolveLang(flags["language"] ?: "system")) }
     val dark = when(flags["theme"]) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
     val scale = when(flags["text"]) { "compact" -> 0.9f; "large" -> 1.16f; else -> 1f }
     PresenceTheme(dark, flags["palette"] ?: "grove", scale) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            CompositionLocalProvider(LocalUiText provides t) { chrome() }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             CompositionLocalProvider(LocalContext provides DesktopContext(app), LocalUiText provides t,
                 LocalUiLayout provides UiLayout(maxWidth, maxHeight, false)) {
                 Shell(app, rows, t, true, LocalUiLayout.current.twoPanes)
             }
+        }
         }
     }
 }

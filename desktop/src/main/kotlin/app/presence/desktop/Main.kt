@@ -55,15 +55,19 @@ fun main() {
             onDispose { icon?.let { SystemTray.getSystemTray().remove(it) } }
         }
         widgets.toList().forEach { widget -> key(widget) {
-            Window(onCloseRequest = { widgets.remove(widget) },title = "Presence · $widget", icon = painterResource("presence.png"), state = rememberWindowState(width = 340.dp,height = 300.dp),alwaysOnTop = true) {
-                WidgetContent(widget,app) { visible = true }
+            val widgetState = rememberWindowState(width = 340.dp,height = 348.dp)
+            Window(onCloseRequest = { widgets.remove(widget) },title = "Presence · $widget", icon = painterResource("presence.png"), state = widgetState, alwaysOnTop = true, undecorated = true) {
+                window.minimumSize = Dimension(280,240)
+                WidgetContent(widget,app,open = { visible = true }, chrome = { PresenceTitleBar(widgetState, { widgets.remove(widget) }) })
             }
         } }
-        Window(onCloseRequest = { if(traySupported) visible = false else exiting = true }, visible = visible,
-            title = "Presence", icon = painterResource("presence.png"), state = rememberWindowState(width = 1180.dp,height = 800.dp),
+        val mainState = rememberWindowState(width = 1180.dp,height = 848.dp)
+        val closeMain = { if(traySupported) visible = false else exiting = true }
+        Window(onCloseRequest = closeMain, visible = visible, undecorated = true,
+            title = "Presence", icon = painterResource("presence.png"), state = mainState,
             onKeyEvent = { event -> if(event.type == KeyEventType.KeyUp && event.key == Key.Escape && app.back != null) { app.back?.invoke(); true } else false }) {
-            window.minimumSize = Dimension(700,560)
-            PresenceRoot(app)
+            window.minimumSize = Dimension(700,608)
+            PresenceRoot(app) { PresenceTitleBar(mainState, closeMain) }
             if(exiting) {
                 val t = T(resolveLang(store.flag("language","system")))
                 AlertDialog(onDismissRequest = { exiting = false }, title = { Text("Quit Presence?") },
