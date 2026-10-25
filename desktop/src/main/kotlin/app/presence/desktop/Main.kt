@@ -109,7 +109,12 @@ fun main() {
             Picker("Project", projects.map { it.id to it.f("name") }, projectId) { projectId = it; taskId = null }
             if (projectId != null) Picker("Task", rows.alive(KIND_TASK).filter { it.f("projectId") == projectId && it.f("done") != "1" }.map { it.id to it.f("title") }, taskId) { taskId = it }
         }
-        val value = timer.display()
+        val value = if (!busy && tracking) 0L else if (!busy && project != null) {
+            val work = (project.f("workSec").toLongOrNull() ?: store.pref("work_sec", "3600").toLongOrNull() ?: 3600L).coerceIn(1,356400) * 1000
+            val shorts = project.f("shortCount").toIntOrNull() ?: store.pref("short_count", "2").toIntOrNull() ?: 2
+            val longs = project.f("longCount").toIntOrNull() ?: store.pref("long_count", "0").toIntOrNull() ?: 0
+            stretchLengths(work, stretchCount(shorts.coerceIn(0,24), longs.coerceIn(0,24))).first()
+        } else timer.display()
         val progress = if (snap.phaseMillis > 0 && busy) (1f - value.toFloat() / snap.phaseMillis).coerceIn(0f,1f) else 0f
         Box(Modifier.size(280.dp).padding(8.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator({ if (tracking) 0f else progress }, Modifier.fillMaxSize(), strokeWidth = 9.dp, trackColor = MaterialTheme.colorScheme.surfaceVariant, strokeCap = StrokeCap.Round)
