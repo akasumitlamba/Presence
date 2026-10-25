@@ -27,7 +27,7 @@ import org.json.JSONObject
 
 internal data class UiLayout(val width: Dp = 360.dp, val height: Dp = 800.dp, val keyboard: Boolean = false) {
     val short get() = height < 480.dp
-    val rail get() = width >= 600.dp || (short && width > height)
+    val rail get() = width > height
     val twoPanes get() = width >= 900.dp && !short
     val margin get() = if (twoPanes) 24.dp else 16.dp
 }
@@ -76,10 +76,11 @@ internal fun SectionCard(title: String? = null, modifier: Modifier = Modifier, s
 }
 
 @Composable
-internal fun Metric(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+internal fun Metric(label: String, value: String, modifier: Modifier = Modifier, centered: Boolean = false) {
+    val alignment = if (centered) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start
+    Column(modifier, horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = alignment)
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, textAlign = alignment)
     }
 }
 

@@ -306,10 +306,12 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
-            if (!layout.rail) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, windowInsets = WindowInsets(0)) {
-                destinations(t).forEach { item ->
-                    NavigationBarItem(modifier = Modifier.semantics { contentDescription = item.title }, selected = tab == item.id, onClick = { tab = item.id; pairing = false }, icon = { Icon(item.icon, null) },
-                        label = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelSmall) }, colors = presenceNavColors())
+            if (!layout.rail) Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow), contentAlignment = Alignment.Center) {
+                NavigationBar(modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceContainerLow, windowInsets = WindowInsets(0)) {
+                    destinations(t).forEach { item ->
+                        NavigationBarItem(modifier = Modifier.semantics { contentDescription = item.title }, selected = tab == item.id, onClick = { tab = item.id; pairing = false }, icon = { Icon(item.icon, null) },
+                            label = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelSmall) }, colors = presenceNavColors())
+                    }
                 }
             }
         },
@@ -331,18 +333,20 @@ private fun destinations(t: T) = listOf(
 @Composable
 private fun Rail(t: T, tab: String, onTab: (String) -> Unit) {
     val short = LocalUiLayout.current.short
-    Column(Modifier.width(if (short) 72.dp else 80.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow)
-        .presenceScroll(rememberScrollState()).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(if (short) 0.dp else 8.dp)) {
-        destinations(t).forEach { item ->
-            val selected = tab == item.id
-            Surface(onClick = { onTab(item.id) }, shape = RoundedCornerShape(12.dp),
-                color = if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
-                contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp).fillMaxWidth().heightIn(min = 48.dp)) {
-                Column(Modifier.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(item.icon, null, Modifier.size(22.dp))
-                    Text(item.title, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center)
+    BoxWithConstraints(Modifier.width(if (short) 72.dp else 80.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.fillMaxWidth().presenceScroll(rememberScrollState()).heightIn(min = maxHeight).padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(if (short) 0.dp else 8.dp, Alignment.CenterVertically)) {
+            destinations(t).forEach { item ->
+                val selected = tab == item.id
+                Surface(onClick = { onTab(item.id) }, shape = RoundedCornerShape(12.dp),
+                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp).fillMaxWidth().heightIn(min = 48.dp)) {
+                    Column(Modifier.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(item.icon, null, Modifier.size(22.dp))
+                        Text(item.title, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center)
+                    }
                 }
             }
         }
@@ -412,10 +416,18 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
     val controls: @Composable () -> Unit = {
         SectionCard(spacing = 8.dp) {
             Box {
-                OutlinedTextField(project?.f("name") ?: t.chooseProject, {}, readOnly = true, singleLine = true,
-                    label = { Text(t.projects) }, trailingIcon = { Icon(Icons.Outlined.ExpandMore, null) },
-                    colors = presenceFieldColors(), modifier = Modifier.fillMaxWidth())
-                Box(Modifier.matchParentSize().semantics { contentDescription = t.chooseProject }.clickable { projectMenu = true })
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text(t.projects, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).semantics { contentDescription = t.chooseProject }
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { projectMenu = true },
+                        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        Text(project?.f("name") ?: snap.projectName.takeIf { open && it.isNotBlank() } ?: t.chooseProject,
+                            modifier = Modifier.weight(1f, fill = false), style = MaterialTheme.typography.headlineMedium,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Outlined.ExpandMore, null, Modifier.size(24.dp))
+                    }
+                }
                 DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
                     projects.forEach { item -> DropdownMenuItem(text = { Text(item.f("name")) }, onClick = {
                         projectMenu = false
@@ -454,10 +466,10 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             }
             actionError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Metric(t.loggedTime, if (spent < 60000) clockDigits(spent) else clockWords(spent))
-                Metric(t.pausesLabel, "${snap.pauseCount} · ${clockDigits(pauseNoteMillis(snap, System.currentTimeMillis()))}")
-                Metric(t.streak, streakDays(rows, System.currentTimeMillis(), ZoneId.systemDefault(), globals.dayStart).toString())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Metric(t.loggedTime, if (spent < 60000) clockDigits(spent) else clockWords(spent), Modifier.weight(1f), centered = true)
+                Metric(t.pausesLabel, "${snap.pauseCount} · ${clockDigits(pauseNoteMillis(snap, System.currentTimeMillis()))}", Modifier.weight(1f), centered = true)
+                Metric(t.streak, streakDays(rows, System.currentTimeMillis(), ZoneId.systemDefault(), globals.dayStart).toString(), Modifier.weight(1f), centered = true)
             }
             if (!androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
         }
@@ -466,15 +478,30 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         val columns = maxWidth >= 620.dp
         val ringSize = if (columns) minOf(360.dp, maxHeight - 8.dp, maxWidth * 0.45f) else minOf(320.dp, maxWidth, maxHeight * 0.5f)
         val ring: @Composable () -> Unit = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size((ringSize - 28.dp).coerceAtLeast(120.dp)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(ringSize.coerceAtLeast(120.dp)), contentAlignment = Alignment.Center) {
                 val accent = MaterialTheme.colorScheme.primary
                 val track = MaterialTheme.colorScheme.outlineVariant
                 val progress = if (open && snap.kind != "track" && snap.phaseMillis > 0 && snap.status != "awaiting") (worked.toFloat() / snap.phaseMillis).coerceIn(0f,1f) else 0f
                 Canvas(Modifier.fillMaxSize().padding(8.dp).semantics { contentDescription = "${phase(t, snap.kind)} ${clockDigits(face)}" }) {
                     val stroke = Stroke(12.dp.toPx(), cap = StrokeCap.Round)
-                    drawArc(track, -90f, 360f, false, style = stroke)
-                    if (progress > 0) drawArc(accent, -90f, progress * 360f, false, style = stroke)
+                    val inset = 16.dp.toPx()
+                    val dialSize = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2)
+                    drawArc(track, -90f, 360f, false, topLeft = Offset(inset, inset), size = dialSize, style = stroke)
+                    if (progress > 0) drawArc(accent, -90f, progress * 360f, false, topLeft = Offset(inset, inset), size = dialSize, style = stroke)
+                    if (snap.kind != "track") {
+                        // A concentric lower arc, with a segment for every computed stretch.
+                        val step = 120f / stretches
+                        val gap = minOf(3f, step * 0.3f)
+                        val radius = size.width / 2
+                        val markerWidth = minOf(6.dp.toPx(), radius * Math.toRadians(step.toDouble()).toFloat() * 0.4f)
+                        repeat(stretches) { index ->
+                            val done = open && index < snap.stretchIndex
+                            val current = index == (if (open) snap.stretchIndex else 0)
+                            drawArc(if (done || current) accent.copy(alpha = if (done) 1f else 0.6f) else track,
+                                150f - index * step - gap / 2, -(step - gap), false,
+                                style = Stroke(markerWidth, cap = StrokeCap.Round))
+                        }
+                    }
 
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
@@ -489,21 +516,6 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (snap.status == "paused") Text(t.paused, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
-            }
-            if (snap.kind != "track") {
-                val accent = MaterialTheme.colorScheme.primary
-                val track = MaterialTheme.colorScheme.outlineVariant
-                Canvas(Modifier.width((ringSize - 40.dp).coerceAtLeast(100.dp)).height(20.dp).semantics { contentDescription = t.cycleLine(if (open) (snap.stretchIndex + 1).coerceAtMost(stretches) else 1, stretches) }) {
-                    val gap = minOf(6.dp.toPx(), size.width / (stretches * 3f))
-                    val bar = (size.width - gap * (stretches - 1)) / stretches
-                    repeat(stretches) { index ->
-                        val done = open && index < snap.stretchIndex
-                        val current = index == (if (open) snap.stretchIndex else 0)
-                        drawRoundRect(if (done || current) accent.copy(alpha = if (done) 1f else 0.6f) else track,
-                            Offset(index * (bar + gap), 7.dp.toPx()), androidx.compose.ui.geometry.Size(bar, 6.dp.toPx()), androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
-                    }
-                }
-            }
             }
         }
         if (maxHeight < 180.dp) Column(Modifier.fillMaxSize().presenceScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1096,6 +1108,11 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                 }
             }
         }
+        item(key = "charts") {
+            if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(Modifier.weight(1.2f)) { chart() }; Box(Modifier.weight(1f)) { projectChart() }
+            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { chart(); projectChart() }
+        }
         item(key = "streak") { SectionCard(t.streak) {
             Text(t.streakLine(streakDays(rows, System.currentTimeMillis(), zone, dayStart), loggedToday(rows, System.currentTimeMillis(), zone, dayStart)), style = MaterialTheme.typography.titleMedium)
         } }
@@ -1110,11 +1127,6 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                 SectionCard(modifier = Modifier.weight(1f)) { Metric(t.focusTime, clockWords(total)) }
                 SectionCard(modifier = Modifier.weight(1f)) { Metric(t.sessions, count.toString()) }
             }
-        }
-        item(key = "charts") {
-            if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.weight(1.2f)) { chart() }; Box(Modifier.weight(1f)) { projectChart() }
-            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { chart(); projectChart() }
         }
         item(key = "calendar") {
             val calendar: @Composable () -> Unit = { SectionCard { CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it; anchor = it; pickedBar = -1 }) } }
