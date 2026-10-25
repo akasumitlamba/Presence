@@ -16,4 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "presence"
 include(":core")
-include(":app")
+// Desktop builds do not require an Android SDK.
+if (!providers.gradleProperty("desktopOnly").isPresent) include(":app")
+include(":desktop")

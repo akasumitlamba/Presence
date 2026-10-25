@@ -1,0 +1,33 @@
+app-id: app.presence.Presence
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: presence
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --device=dri
+  - --socket=pulseaudio
+  - --filesystem=xdg-documents
+modules:
+  - name: presence
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/presence /app/bin
+      - cp -a Presence/. /app/presence/
+      - printf '#!/bin/sh\nexec /app/presence/bin/Presence "$@"\n' > /app/bin/presence
+      - chmod +x /app/bin/presence /app/presence/bin/Presence
+      - install -Dm644 app.presence.Presence.desktop /app/share/applications/app.presence.Presence.desktop
+      - install -Dm644 app.presence.Presence.metainfo.xml /app/share/metainfo/app.presence.Presence.metainfo.xml
+      - install -Dm644 presence.png /app/share/icons/hicolor/512x512/apps/app.presence.Presence.png
+    sources:
+      - type: dir
+        path: ../build/compose/binaries/main/app
+      - type: file
+        path: app.presence.Presence.desktop
+      - type: file
+        path: app.presence.Presence.metainfo.xml
+      - type: file
+        path: ../../assets/presence.png

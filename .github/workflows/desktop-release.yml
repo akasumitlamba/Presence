@@ -1,0 +1,80 @@
+name: Desktop release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['desktop-v*']
+permissions:
+  contents: write
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            task: packageDeb
+            extension: deb
+          - os: windows-2022
+            task: packageExe
+            extension: exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot flatpak-builder xvfb libgl1-mesa-dri
+      - name: Build and test
+        shell: bash
+        run: ./gradlew -PdesktopOnly :core:test :desktop:test :desktop:${{ matrix.task }} :desktop:createDistributable --console=plain
+      - name: Smoke test desktop UI
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set +e
+          timeout 15s xvfb-run -a desktop/build/compose/binaries/main/app/Presence/bin/Presence > desktop-smoke.log 2>&1
+          result=$?
+          cat desktop-smoke.log
+          test "$result" = 124
+          ! grep -E 'Exception|Failed to|UnsatisfiedLinkError' desktop-smoke.log
+      - name: Build Flatpak
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+          flatpak-builder --user --force-clean --disable-rofiles-fuse --repo=flatpak-repo flatpak-build desktop/packaging/app.presence.Presence.yml
+          flatpak build-bundle flatpak-repo Presence-2.2.1-linux-x86_64.flatpak app.presence.Presence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: |
+            desktop/build/compose/binaries/main/${{ matrix.extension }}/*.${{ matrix.extension }}
+            *.flatpak
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: native
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish desktop release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mkdir -p dist
+          find release-assets -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.flatpak' \) -exec cp {} dist/ \;
+          cd dist
+          sha256sum * > SHA256SUMS
+          cd ..
+          gh release create "$GITHUB_REF_NAME" dist/* --title "Presence Desktop 2.2.1" --notes-file desktop/RELEASE_NOTES.md --prerelease

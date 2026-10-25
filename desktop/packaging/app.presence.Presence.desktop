@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Presence
+Comment=Make time for one thing
+Exec=presence
+Icon=app.presence.Presence
+Categories=Office;Utility;
+Terminal=false
+StartupWMClass=app.presence.desktop.MainKt
