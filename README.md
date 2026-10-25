@@ -1,101 +1,80 @@
 # Presence
 
-Presence is an offline focus-cycle timer and time tracker for Android. It is the time you give to one piece of work. Projects, tasks, and sessions stay on the phone. There is no account, cloud service, analytics, or Android cloud backup. The network permission is used only for local Wi-Fi/Ethernet sync.
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" alt="Presence app icon">
 
-Package: `app.presence`. Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+Presence is a focus timer for Android. It is the time you give to one piece of work. Projects, tasks, and sessions stay on the phone. There is no account.
+
+[Download Presence](https://github.com/akasumitlamba/Presence/releases/download/v2.1.0/presence.apk)
+
+The current release is version 2.1.0, versionCode 11. Package name: `app.presence`.
 
 ## Install
 
-1. Download `presence.apk` from the GitHub Release.
-2. On the phone, allow install from your browser or file app.
-3. Open the APK and install it.
-4. The debug signature is the one this build uses, so a later install must be the same signature or the previous copy has to be removed first.
+1. Download the APK from the link above.
+2. On the phone, allow the browser or the file app to install it.
+3. Open the file and install Presence.
 
-The APK is signed and can be installed without Play Store billing.
+A later copy installs over this one when it is signed with the same key. The app does not use Play Store billing. Every feature is free.
 
-## Features
+## Timer
 
-Everything in Presence is free. There is no premium tier and no tester switch.
+Work time is one duration for a project. The default is one hour. That duration is split into equal stretches. Stretch count is the short-break count plus the long-break count plus one. One hour with two short breaks is three stretches of twenty minutes. Any other duration splits the same way.
 
-- Work time split into equal stretches, with short and long breaks between them
-- Continue, pause, stop, and skip, plus free tracking, count-up display, and optional auto-continue
-- Projects, tasks, and tags. A project is a name, and it can be deleted
-- A todo list: add, complete, and delete
-- A project goal and the daily target that shrinks as you log time
-- Today, week, month, and year, with a bar chart, a pie chart, and a month calendar
-- Sharing a stats summary and adding a past stretch by hand
-- Visible streak counters on Timer and Stats
-- First-launch instructions, replayable from Settings, and an app launch screen
-- The minimized timer bar
-- The ongoing notification with the time left
-- A daily reminder and a streak reminder, each with a time you set
-- The chime when a stretch ends
-- Rain, brook, and hearth, plus bell, pulse, and an alarm sound copied from the phone
-- Lengths saved on one project
-- The timer keeps going in the background, on the lock screen, and after the process is killed
-- Follow system, light, or dark, plus text size and the hour the day starts
-- English, Turkish, Spanish, Portuguese, French, Japanese, and Korean
-- Wi-Fi pairing and sync
-- Phone layout and the wider layout
-- Home-screen widgets: session (start or pause), stats, streak, and todos
-- A backup file of projects, tasks, and sessions, a CSV of sessions, and bringing a backup back in
+Play starts a sitting. When a stretch ends, the next break starts by itself. When the break ends, the next stretch waits until you press Play. After the last stretch, the sitting is idle. Stop ends the sitting, including one that is waiting after a break.
 
-Source Sans 3 is bundled for the app and the widgets. Its license is in `third_party/source-sans-3/LICENSE.md`.
+Pause is on the timer. Time spent paused is not work and is not a break. It is not written into stats. While a sitting is open, the bottom of the timer shows how many pauses happened and how long they added up to. That note disappears when the sitting ends.
 
-## Focus plans
+The circle is split into one arc per stretch, with gaps between the arcs and a dot on the current position. The center shows the time left in the current phase. Under that, smaller, is the time already spent working on this project.
 
-Work time is one project duration. The default is one hour. Stretch count is the short-break count plus the long-break count plus one, and each stretch is that duration divided evenly. One hour with two short breaks is three 20-minute stretches. A different duration splits the same way.
+The project control is one dropdown. It lists the projects you already have, and the last entry is New project. A project is a name. You can delete it. Projects are not grouped.
 
-Breaks start when a stretch ends. The next stretch waits until Play unless auto-continue is enabled. Stop ends the sitting, including one that is waiting after a break. Pauses are not work and are not written into stats. The ring shows progress through the current phase, with markers and a computed count for the sitting’s focus stretches. Countdown and count-up displays share the same deadline; free tracking has no automatic deadline.
+Duration fields are hours, minutes, and seconds. Work time, short breaks, and long breaks sit in their own sections. Edits are saved as you make them.
 
-Settings changes apply to the next sitting. An open sitting keeps its lengths and its project. Only focus and tracking count toward goals and statistics. A late alarm does not add the delay as work or as a pause.
+## Also on the phone
 
-## Pair two phones
+Appearance can follow the system, or stay light or dark. The color themes are Grove, Harbor, Dusk, Slate, Berry, Amber, Moss, Iris, Copper, Tide, and Ink. Text size is a setting, and so is the hour the day starts.
 
-Both phones need Presence and the same Wi-Fi. Mobile data is not used. On Android 13 and later, showing or entering a code requests nearby-Wi-Fi access. Presence does not request location access.
+Todos can be added, completed, and deleted.
 
-1. On one phone, open Settings → Pair on Wi-Fi → **Show code**.
-2. On the other, choose **Enter code** and type the four digits.
-3. The code lasts 10 minutes, or until the pair succeeds. A wrong code and an expired code each get a plain explanation.
-4. After that, the phones remember each other and sync on the same Wi-Fi without a new code while Presence is running. Discovery and a periodic pass pick up changes automatically. **Sync now** runs a pass immediately.
+A daily reminder and a streak reminder each have a time you set.
 
-What syncs: groups, tags, projects, tasks, completed sessions, goals, and timer settings. What stays on each phone: appearance, text size, language, reminders, todos, and a custom alarm file.
+Home-screen widgets cover the session, stats, the streak, and todos. The session widget can start or pause.
 
-If the same record changes on both phones, the later edit wins. If a timer is running, that open session is not overwritten and it is not counted twice. Incoming timer settings are saved for the next plan without changing an active timer. Discovery advertises that pairing is available, never the PIN itself. Sync sockets bind to Wi-Fi/Ethernet and reject public peer addresses.
+The timer keeps going when you leave Presence, lock the screen, or the process is killed. The notification shows the time left. When a phase ends, the alarm plays even if Presence is not in front.
 
-## Background
+Stats cover today, the week, the month, and the year, with a bar chart, a pie chart, and a month calendar. You can share a summary and add a past stretch by hand.
 
-The phase keeps going when you leave Presence, lock the screen, or the process is killed. The notification shows the time left. When the length is reached, the alarm plays and a notification appears even if Presence is not in front. A paused phase stays paused with the same time left.
+Settings has a row named SD card. If the phone has a removable card, Presence can keep its database in the app’s own folder on that card. It does not ask for access to every file on the card.
+
+Languages are English, Turkish, Spanish, Portuguese, French, Japanese, and Korean. The first launch follows the phone when that language is one of these. Otherwise it starts in English.
+
+A narrow window uses one column and a bottom bar. A wide window uses a navigation rail, the timer beside its controls, and a project list beside its detail.
+
+Background sounds are rain, brook, and hearth. The alarm can be a bell, a pulse, or a sound copied from the phone.
+
+## On the device
+
+There is nothing to sign in to, and there is no cloud account. Android cloud backup is off. You can save a backup of projects, tasks, and sessions, save a CSV of sessions, and bring a backup back in.
+
+Two phones on the same Wi-Fi can pair. One shows a four-digit code. The other enters it. The code lasts ten minutes, or until the pair succeeds. After that, the phones remember each other and sync while Presence is running. No server is involved.
+
+What syncs: projects, tasks, tags, completed sessions, goals, and timer settings. What stays on each phone: appearance, text size, language, reminders, todos, and a custom alarm file. If the same record changes on both phones, the later edit wins. A running timer is not overwritten and is not counted twice.
 
 ## Build
 
-Install JDK 17 or newer and Android SDK 35 (platform and build-tools 35). Point `ANDROID_HOME` at the SDK, or put `sdk.dir` in `local.properties`.
+Install JDK 17 or newer and Android SDK 35, including the platform and build-tools 35. Point `ANDROID_HOME` at the SDK, or put `sdk.dir` in `local.properties`.
 
 ```bash
 ./gradlew :core:test
 ./gradlew assembleDebug
 ```
 
-The installable APK is `app/build/outputs/apk/debug/app-debug.apk`. `assembleRelease` uses the same debug signature so it is installable too.
+The APK is `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Layout and appearance
-
-The interface responds to available width and height after system bars and cutouts. Portrait phones use bottom navigation; short landscape phones use a compact rail and scrollable single-pane forms. Wide tablets use a rail, project master-detail, and bounded chart/settings grids. Todos use one bounded list at every size. Drafts and navigation survive resize and rotation.
-
-System insets are owned by the root; keyboard avoidance belongs to the content. Text preferences change typography rather than dp density and retain Android font scaling. Duration editors retain hours, minutes and seconds. Work stretch count is computed from the break counts and is never independently editable.
-
-All eleven palettes remain available: Grove, Harbor, Dusk, Slate, Berry, Amber, Moss, Iris, Copper, Tide and Ink. Every palette supports Light, Dark and Follow system. Appearance, palettes and language remain device-local preferences.
-
-Statistics use calendar days, Monday-first weeks, calendar months and years. The weekly overview has an explicit date label. Zero activity displays zero totals, no positive bars and an unfilled data ring. Manual sessions have real date/time pickers and reject future or overlapping work.
-
-## Languages
-
-Settings → Language. The first launch follows the phone when it is Turkish, Spanish, Portuguese, French, Japanese, or Korean. Otherwise it starts in English.
+Source Sans 3 is bundled for the app and the widgets. Its license is in `third_party/source-sans-3/LICENSE.md`.
 
 ## License
 
 Copyright 2026 Sumit Kumar.
 
-Licensed under the Apache License, Version 2.0. You may obtain a copy of the license in [LICENSE](LICENSE), or at http://www.apache.org/licenses/LICENSE-2.0.
-
-All four home-screen widgets follow the selected palette and light/dark/system mode, including their icons, backgrounds, text, and timer action.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE), or http://www.apache.org/licenses/LICENSE-2.0.
