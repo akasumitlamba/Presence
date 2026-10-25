@@ -1,6 +1,7 @@
 package app.presence.desktop
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -23,6 +24,12 @@ fun main() {
     if (lock == null) { showError("Presence is already running."); channel.close(); return }
     val store = try { Store() } catch(e: Exception) { showError("Could not open Presence data: ${e.message}\nYour data has been left in place."); lock.release(); channel.close(); return }
     val app = PresenceApp(store)
+    val renderFile = System.getenv("PRESENCE_RENDER_FILE")
+    if (renderFile != null) {
+        try { renderDesktopPreview(app, Paths.get(renderFile), System.getenv("PRESENCE_RENDER_WIDTH")?.toIntOrNull() ?: 1180, System.getenv("PRESENCE_RENDER_HEIGHT")?.toIntOrNull() ?: 800) }
+        finally { app.close(); lock.release(); channel.close() }
+        return
+    }
     application {
         var visible by remember { mutableStateOf(true) }
         var exiting by remember { mutableStateOf(false) }
@@ -32,7 +39,17 @@ fun main() {
         val exit = { app.close(); lock.release(); channel.close(); exitApplication() }
         DisposableEffect(Unit) {
             var icon: TrayIcon? = null
-            if(SystemTray.isSupported()) {
+            var linux: LinuxTray? = null
+            if (System.getProperty("os.name").startsWith("Linux")) {
+                runCatching {
+                    linux = LinuxTray({ visible = true }, {
+                        val s = app.center.snap()
+                        if(s.status == "running") app.center.pause() else if(s.status == "paused") app.center.resume() else visible = true
+                    }, { app.center.stop() }, { id -> if(id !in widgets) widgets.add(id) }, { exiting = true; visible = true })
+                    app.notifier.nativeNotify = { title, body -> linux?.notify(title,body) }
+                    traySupported = true
+                }.onFailure { System.err.println("Presence: no StatusNotifier tray host; close will ask to quit."); if (System.getenv("PRESENCE_DEBUG") == "1") it.printStackTrace() }
+            } else if(SystemTray.isSupported()) {
                 val image = ImageIO.read(object {}.javaClass.getResourceAsStream("/presence.png"))
                 icon = TrayIcon(image,"Presence").apply {
                     isImageAutoSize = true
@@ -52,22 +69,22 @@ fun main() {
                 }
                 runCatching { SystemTray.getSystemTray().add(icon); app.notifier.tray = icon; traySupported = true }.onFailure { icon = null }
             }
-            onDispose { icon?.let { SystemTray.getSystemTray().remove(it) } }
+            onDispose { icon?.let { SystemTray.getSystemTray().remove(it) }; linux?.close(); app.notifier.nativeNotify = null; app.notifier.tray = null }
         }
         widgets.toList().forEach { widget -> key(widget) {
-            val widgetState = rememberWindowState(width = 340.dp,height = 348.dp)
+            val widgetState = rememberWindowState(width = 340.dp,height = 300.dp)
             Window(onCloseRequest = { widgets.remove(widget) },title = "Presence · $widget", icon = painterResource("presence.png"), state = widgetState, alwaysOnTop = true, undecorated = true) {
                 window.minimumSize = Dimension(280,240)
-                WidgetContent(widget,app,open = { visible = true }, chrome = { PresenceTitleBar(widgetState, { widgets.remove(widget) }) })
+                WindowDraggableArea(Modifier.fillMaxSize()) { WidgetContent(widget,app,open = { visible = true }, chrome = { PresenceWindowControls(widgetState, { widgets.remove(widget) }, compact = true) }) }
             }
         } }
-        val mainState = rememberWindowState(width = 1180.dp,height = 848.dp)
+        val mainState = rememberWindowState(width = 1180.dp,height = 800.dp)
         val closeMain = { if(traySupported) visible = false else exiting = true }
         Window(onCloseRequest = closeMain, visible = visible, undecorated = true,
             title = "Presence", icon = painterResource("presence.png"), state = mainState,
             onKeyEvent = { event -> if(event.type == KeyEventType.KeyUp && event.key == Key.Escape && app.back != null) { app.back?.invoke(); true } else false }) {
-            window.minimumSize = Dimension(700,608)
-            PresenceRoot(app) { PresenceTitleBar(mainState, closeMain, showIcon = false) }
+            window.minimumSize = Dimension(700,560)
+            PresenceRoot(app, chrome = { PresenceWindowControls(mainState, closeMain) }, dragArea = { modifier, content -> WindowDraggableArea(modifier) { content() } })
             if(exiting) {
                 val t = T(resolveLang(store.flag("language","system")))
                 AlertDialog(onDismissRequest = { exiting = false }, title = { Text("Quit Presence?") },

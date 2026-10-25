@@ -296,12 +296,15 @@ private fun Shell(app: PresenceApp, rows: List<Rec>, t: T, premium: Boolean, wid
                 stateHolder.SaveableStateProvider(if (pairing) "pairing" else tab) {
                     when {
                         pairing -> PairPage(app, t, rows)
-                        tab == "timer" -> TimerPage(app, t, rows, premium, wide, snap, shown, fullScreen, { fullScreen = !fullScreen }) { }
+                        tab == "timer" -> TimerPage(app, t, rows, premium, wide, snap, shown, fullScreen) { }
                         tab == "projects" -> ProjectsPage(app, t, rows, premium, wide, projectId, { projectId = it }) { }
                         tab == "todos" -> TodosPage(app, t, rows, wide)
                         tab == "stats" -> StatsPage(app, t, rows, premium, wide, snap) { }
                         else -> SettingsPage(app, t, rows, premium, wide, { pairing = true }) { }
                     }
+                }
+                if (tab == "timer" && !pairing) IconButton(onClick = { fullScreen = !fullScreen }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+                    Icon(if (fullScreen) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen, if (fullScreen) t.exitFullscreen else t.fullscreen)
                 }
             }
         }
@@ -340,7 +343,7 @@ private fun destinations(t: T) = listOf(
 private fun Rail(t: T, tab: String, onTab: (String) -> Unit) {
     val short = LocalUiLayout.current.short
     Column(Modifier.width(if (short) 72.dp else 80.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow), horizontalAlignment = Alignment.CenterHorizontally) {
-        Image(painterResource(R.drawable.ic_launcher_fg), "Presence", Modifier.padding(vertical = 12.dp).size(if (short) 32.dp else 40.dp))
+        Image(painterResource(R.drawable.presence_mark), "Presence", Modifier.padding(vertical = 12.dp).size(if (short) 32.dp else 40.dp))
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().presenceScroll(rememberScrollState()).heightIn(min = maxHeight).padding(vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -388,7 +391,7 @@ private fun phase(t: T, kind: String) = when (kind) {
 }
 
 @Composable
-private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, snap: Snap, shown: Long, immersive: Boolean, onFullscreen: () -> Unit, onGate: () -> Unit) {
+private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean, wide: Boolean, snap: Snap, shown: Long, immersive: Boolean, onGate: () -> Unit) {
     val context = LocalContext.current
     val projects = rows.alive(KIND_PROJECT).sortedBy { it.f("sort").toIntOrNull() ?: 0 }
     var selected by rememberSaveable { mutableStateOf(snap.projectId) }
@@ -543,9 +546,7 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         } else Column(Modifier.fillMaxSize().padding(bottom = 48.dp).presenceScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, if (immersive) Alignment.CenterVertically else Alignment.Top)) {
             ring(); controls(); Spacer(Modifier.height(8.dp))
         }
-        IconButton(onFullscreen, Modifier.align(Alignment.BottomEnd)) {
-            Icon(if (immersive) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen, if (immersive) t.exitFullscreen else t.fullscreen)
-        }
+
     }
     pending?.let { item -> Confirm(t.switchTitle, t.switchBody, t.save, t.cancel, {
         selected = item.id; taskId = null; pending = null; app.center.stop(); app.center.start("focus", item, null)

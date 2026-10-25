@@ -60,21 +60,31 @@ fun shareText(text: String, title: String) {
 }
 class DesktopDatePicker(private val context: DesktopContext, private val chosen: (Any?,Int,Int,Int) -> Unit, year: Int, month: Int, day: Int) {
     private val initial = LocalDate.of(year,month+1,day)
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
     fun show() {
-        val spinner = JSpinner(SpinnerDateModel(Date.from(initial.atStartOfDay(ZoneId.systemDefault()).toInstant()),null,null,java.util.Calendar.DAY_OF_MONTH))
-        spinner.editor = JSpinner.DateEditor(spinner,"yyyy-MM-dd")
-        if (JOptionPane.showConfirmDialog(null,spinner,"Presence",JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            spinner.commitEdit()
-            val d = (spinner.value as Date).toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
-            chosen(null,d.year,d.monthValue-1,d.dayOfMonth)
+        DesktopDialogs.content = {
+            val t = LocalUiText.current
+            val state = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = initial.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli())
+            androidx.compose.material3.DatePickerDialog(onDismissRequest = { DesktopDialogs.content = null },
+                confirmButton = { TextButton({ state.selectedDateMillis?.let { stamp ->
+                    val d = java.time.Instant.ofEpochMilli(stamp).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                    chosen(null,d.year,d.monthValue-1,d.dayOfMonth); DesktopDialogs.content = null
+                } }, enabled = state.selectedDateMillis != null) { Text(t.save) } },
+                dismissButton = { TextButton({ DesktopDialogs.content = null }) { Text(t.cancel) } }) { androidx.compose.material3.DatePicker(state) }
         }
     }
 }
 class DesktopTimePicker(private val context: DesktopContext, private val chosen: (Any?,Int,Int) -> Unit, private val hour: Int, private val minute: Int, private val twentyFour: Boolean) {
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
     fun show() {
-        val h = JSpinner(SpinnerNumberModel(hour,0,23,1)); val m = JSpinner(SpinnerNumberModel(minute,0,59,1))
-        val panel = JPanel().apply { add(h); add(JLabel(":")); add(m) }
-        if (JOptionPane.showConfirmDialog(null,panel,"Presence",JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) { h.commitEdit(); m.commitEdit(); chosen(null,h.value as Int,m.value as Int) }
+        DesktopDialogs.content = {
+            val t = LocalUiText.current
+            val state = androidx.compose.material3.rememberTimePickerState(hour,minute,twentyFour)
+            PresenceDialog(onDismissRequest = { DesktopDialogs.content = null }, title = {},
+                text = { androidx.compose.material3.TimeInput(state) },
+                confirmButton = { TextButton({ chosen(null,state.hour,state.minute); DesktopDialogs.content = null }) { Text(t.save) } },
+                dismissButton = { TextButton({ DesktopDialogs.content = null }) { Text(t.cancel) } })
+        }
     }
 }
 @Composable fun DesktopStoragePane(app: PresenceApp, t: T) {

@@ -19,25 +19,24 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 
-/** App-owned window controls, with the same palette as the screen below. */
+/** Window controls live in the page header area, without separate window chrome. */
 @Composable
-internal fun WindowScope.PresenceTitleBar(state: WindowState, close: () -> Unit, showIcon: Boolean = true) {
+internal fun PresenceWindowControls(state: WindowState, close: () -> Unit, compact: Boolean = false) {
     val t = LocalUiText.current
     val maximized = state.placement == WindowPlacement.Maximized
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            WindowDraggableArea(Modifier.weight(1f).fillMaxHeight()) {
-                Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (showIcon) Image(painterResource("presence.png"), null, Modifier.size(24.dp))
-                    Text("Presence", style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                }
-            }
-            IconButton({ state.isMinimized = true }, Modifier.size(48.dp)) { Icon(Icons.Outlined.Remove, t.minimizeWindow, Modifier.size(18.dp)) }
-            IconButton({ state.placement = if (maximized) WindowPlacement.Floating else WindowPlacement.Maximized }, Modifier.size(48.dp)) {
-                Icon(if (maximized) Icons.Outlined.FilterNone else Icons.Outlined.CropSquare, if (maximized) t.restoreWindow else t.maximizeWindow, Modifier.size(18.dp))
-            }
-            IconButton(close, Modifier.size(48.dp), colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Icon(Icons.Outlined.Close, t.closeWindow, Modifier.size(20.dp)) }
+    val size = if (compact) 36.dp else 44.dp
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton({ state.isMinimized = true }, Modifier.size(size)) { Icon(Icons.Outlined.Remove, t.minimizeWindow, Modifier.size(18.dp)) }
+        IconButton({ state.placement = if (maximized) WindowPlacement.Floating else WindowPlacement.Maximized }, Modifier.size(size)) {
+            Icon(if (maximized) Icons.Outlined.FilterNone else Icons.Outlined.CropSquare, if (maximized) t.restoreWindow else t.maximizeWindow, Modifier.size(18.dp))
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        IconButton(close, Modifier.size(size), colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Icon(Icons.Outlined.Close, t.closeWindow, Modifier.size(20.dp)) }
     }
+}
+
+internal val LocalHeaderDrag = androidx.compose.runtime.staticCompositionLocalOf<@Composable (Modifier, @Composable () -> Unit) -> Unit> { { modifier, content -> Box(modifier) { content() } } }
+
+@Composable internal fun PresenceBrand(modifier: Modifier) {
+    val mark = androidx.compose.runtime.remember { androidx.compose.ui.res.loadImageBitmap(object {}.javaClass.getResourceAsStream("/presence-mark.png")!!) }
+    Image(mark, "Presence", modifier, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
 }

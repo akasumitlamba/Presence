@@ -11,6 +11,9 @@ finish-args:
   - --socket=wayland
   - --device=dri
   - --socket=pulseaudio
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+  - --own-name=app.presence.Presence.StatusNotifier.*
   - --filesystem=home
   - --filesystem=/media
   - --filesystem=/run/media

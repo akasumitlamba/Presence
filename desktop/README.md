@@ -63,3 +63,5 @@ Desktop advertises `_presence._tcp.local.` with the same `id`, `nm`, and optiona
 The Desktop release workflow tests the shared core and desktop storage, builds both installers, launches the packaged apps, and builds Flatpak. Manual workflow runs save artifacts; `desktop-v*` tags publish a prerelease after successful builds. Checksums accompany releases.
 
 Android release signing uses the existing external keystore (`PRESENCE_KEYSTORE`, or `~/.android/debug.keystore`) and checks its SHA-256 certificate before building. The key is never committed. The hosted workflow produces desktop artifacts; publish these together with the verified local Android APK and SHA256SUMS in one release.
+
+Linux tray icons use the StatusNotifier service (available on KDE and desktops with StatusNotifier support), with transparent ARGB pixmaps and a native tray menu. If the desktop has no tray host, closing Presence asks to quit instead of leaving an inaccessible hidden window.

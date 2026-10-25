@@ -1,10 +1,11 @@
 Presence 1.1.1 for Android, Windows and Linux. Every feature is free; there are no paid plans.
 
-- In-app desktop title bars with minimize, maximize/restore and close controls, including floating widgets.
-- Fullscreen focus timer: hide app navigation, with Android system bars hidden until exit or Back.
+- Adaptive desktop layout, with a larger timer and wider project/statistics panes when maximized. Integrated window controls with minimize, maximize/restore and close actions, including floating widgets.
+- Dropdowns render inside the desktop window with anchored placement, the app palette and Source Sans font; themed date and time pickers.
+- Android fullscreen focus timer: hide app navigation, with Android system bars hidden until exit or Back.
 - Balanced task choices and period selectors, full-width project creation, equal Stats columns/actions, and tag scrolling buttons shared with Android.
-- Rounded icons with an alpha-only mask to remove white edge fringes.
-- Android `presence.apk`, versionCode 19, signed with the verified certificate matching the connected tablet (SHA-256 `CD:D3:62:79:1C:6F:2F:1C:64:C9:80:3A:D1:85:96:31:F9:C4:AC:D9:9D:3A:8F:2B:4A:6D:0C:61:7D:B9:2B:12`).
+- Rounded icons with transparent edges. Linux uses native StatusNotifier ARGB icons to avoid the opaque AWT tray background; supported desktops can reopen Presence and use its tray controls.
+- Android `presence.apk`, versionCode 21, signed with the verified certificate matching the connected tablet (SHA-256 `CD:D3:62:79:1C:6F:2F:1C:64:C9:80:3A:D1:85:96:31:F9:C4:AC:D9:9D:3A:8F:2B:4A:6D:0C:61:7D:B9:2B:12`).
 - Windows `.exe` installer, Debian/Ubuntu `.deb`, and Linux `.flatpak` bundle, with Java included.
 - UI and timer controls built directly from Android's source, including its eleven palettes, seven languages, text sizes and introduction.
 - Projects, ordering, tasks, tags and filters, goals/deadlines and daily targets; local todos.
@@ -23,3 +24,5 @@ Connect devices to the same local network. Allow Presence on private networks in
 Closing to the tray keeps timers, reminders and sync running. Explicitly quitting stops background activity until reopening; saved timers recover. Home-screen widgets are provided as floating desktop windows, and platform file/date/share dialogs use desktop equivalents.
 
 Automated protocol/storage/timer/audio tests, local mDNS pairing and packaged launch checks cover the implementation. Physical Android-to-PC Wi-Fi, suspend/resume and hardware audio/notification testing remain to be completed. Installers are unsigned; checksums are in `SHA256SUMS`.
+
+Version numbering resets to 1.1.1. Android updates in place because versionCode increases to 21. If Windows blocks installation over a higher 2.x package, uninstall that package first; Presence stores data separately in your user data directory.

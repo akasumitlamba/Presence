@@ -48,8 +48,11 @@ class DesktopAudio(private val store: Store) : AutoCloseable {
 }
 class DesktopNotifier {
     @Volatile var tray: TrayIcon? = null
+    @Volatile var nativeNotify: ((String,String) -> Unit)? = null
     fun requestPermission() { /* Desktop notifications have no Android runtime permission. */ }
     fun show(title: String,text: String) {
+        val native = nativeNotify
+        if (native != null) { native(title,text); return }
         val icon = tray
         if (icon != null) EventQueue.invokeLater { icon.displayMessage(title,text,TrayIcon.MessageType.INFO) }
         else EventQueue.invokeLater { javax.swing.JOptionPane.showMessageDialog(null,text,title,javax.swing.JOptionPane.INFORMATION_MESSAGE) }

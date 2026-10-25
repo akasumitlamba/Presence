@@ -20,21 +20,22 @@ s='\n'.join(line for line in s.split('\n') if not line.startswith((
     'import androidx.compose.ui.platform.LocalContext', 'import app.presence.MainActivity',
     'import app.presence.PresenceApp', 'import app.presence.data.', 'import app.presence.timer.', 'import app.presence.widget.')))
 s=section(s,'@Composable\nfun PresenceRoot()', '@Composable\nprivate fun Shell(', '''@Composable
-fun PresenceRoot(app: PresenceApp, chrome: @Composable () -> Unit = {}) {
+fun PresenceRoot(app: PresenceApp, chrome: @Composable () -> Unit = {}, dragArea: @Composable (Modifier, @Composable () -> Unit) -> Unit) {
     val rows by app.repo.observe().collectAsState(initial = app.repo.snapshot())
     val flags = rows.firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.body.orEmpty()
     val t = remember(flags["language"]) { T(resolveLang(flags["language"] ?: "system")) }
     val dark = when(flags["theme"]) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
     val scale = when(flags["text"]) { "compact" -> 0.9f; "large" -> 1.16f; else -> 1f }
     PresenceTheme(dark, flags["palette"] ?: "grove", scale) {
-        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            CompositionLocalProvider(LocalUiText provides t) { chrome() }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             CompositionLocalProvider(LocalContext provides DesktopContext(app), LocalUiText provides t,
+                LocalHeaderDrag provides dragArea,
                 LocalUiLayout provides UiLayout(maxWidth, maxHeight, false)) {
                 Shell(app, rows, t, true, LocalUiLayout.current.twoPanes)
+                Box(Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 8.dp)) { chrome() }
+                DesktopMenuHost()
+                DesktopDialogs.content?.invoke()
             }
-        }
         }
     }
 }
@@ -46,7 +47,18 @@ s=section(s,'    val introPrefs = remember', '    var tick by rememberSaveable',
 s=section(s,'    val permission = rememberLauncher', '    val back: (() -> Unit)?', '')
 # Opt-in screen selection for the existing isolated preview capture mode.
 s=s.replace('mutableStateOf("timer")', 'mutableStateOf(System.getenv("PRESENCE_PREVIEW_PAGE")?.takeIf { System.getenv("PRESENCE_PREVIEW_DIR") != null && it in setOf("timer", "projects", "stats", "settings") } ?: "timer")')
-s=s.replace('import app.presence.R\n', '').replace('R.drawable.ic_launcher_fg', '"presence.png"')
+s=s.replace('import app.presence.R\n', '').replace('Image(painterResource(R.drawable.presence_mark), "Presence",', 'PresenceBrand(')
+# Desktop uses maximize/restore, while Android owns immersive fullscreen.
+s=section(s,'                if (tab == "timer" && !pairing) IconButton(', '            }\n        }\n    }\n    // Keep the content/provider', '')
+s=s.replace('.widthIn(max = 1200.dp)', '')
+s=s.replace('minOf(360.dp, maxHeight - 56.dp, maxWidth * 0.45f)', 'minOf(640.dp, maxHeight - 72.dp, maxWidth * 0.45f)')
+s=s.replace('.coerceIn(36f, 84f)', '.coerceIn(36f, 144f)').replace('.coerceIn(28f, 60f)', '.coerceIn(28f, 104f)')
+s=s.replace('Modifier.width(320.dp)', 'Modifier.width((LocalUiLayout.current.width * 0.28f).coerceIn(320.dp, 440.dp))')
+s=s.replace('height(160.dp)', 'height((LocalUiLayout.current.height * 0.24f).coerceIn(180.dp, 300.dp))')
+s=s.replace('height(196.dp)', 'height((LocalUiLayout.current.height * 0.27f).coerceIn(216.dp, 320.dp))')
+s=s.replace('size(176.dp)', 'size((LocalUiLayout.current.height * 0.24f).coerceIn(196.dp, 288.dp))')
+s=s.replace('DropdownMenu(', 'DesktopDropdownMenu(')
+s=s.replace('var projectMenu by rememberSaveable { mutableStateOf(false) }', 'var projectMenu by rememberSaveable { mutableStateOf(System.getenv("PRESENCE_PREVIEW_DIR") != null && System.getenv("PRESENCE_PREVIEW_MENU") == "project") }')
 s=s.replace('SystemClock.elapsedRealtime()', 'monotonicMillis()')
 s=s.replace('app.presence.data.Globals', 'DesktopGlobals')
 s=s.replace('            android.util.Log.e("Presence", "Timer action failed", error)', '            error.printStackTrace()')
@@ -68,6 +80,8 @@ assert 'android.' not in s, [line for line in s.splitlines() if 'android.' in li
 (out/'Screens.kt').write_text(s,encoding='utf-8')
 s=base((ui/'Design.kt').read_text(encoding='utf-8')).replace('androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp', 'LocalUiLayout.current.height')
 s=s.replace('val rail get() = width > height', 'val rail get() = width >= 640.dp')
+s=s.replace('.padding(horizontal = LocalUiLayout.current.margin, vertical = if (compact) 0.dp else 8.dp)', '.padding(start = LocalUiLayout.current.margin, end = 152.dp, top = if (compact) 0.dp else 8.dp, bottom = if (compact) 0.dp else 8.dp)')
+s=s.replace('        Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)', '        LocalHeaderDrag.current(Modifier.weight(1f).height(if (compact) 40.dp else 56.dp)) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis) } }')
 (out/'Design.kt').write_text(s,encoding='utf-8')
 (out/'L10n.kt').write_text(base((ui/'L10n.kt').read_text(encoding='utf-8')),encoding='utf-8')
 s=base((ui/'Introduction.kt').read_text(encoding='utf-8')).replace('import app.presence.R\n','').replace('R.drawable.ic_launcher_fg', '"presence.png"')

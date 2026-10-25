@@ -73,6 +73,7 @@ tasks.processResources {
     dependsOn(generateDesktopIcons)
     from(rootProject.file("app/src/main/res/font")) { include("*.ttf"); into("font") }
     from(desktopIcons) { include("presence.png") }
+    from(rootProject.file("mark.png")) { rename { "presence-mark.png" } }
     from(rootProject.file("third_party/source-sans-3")) { into("licenses/source-sans-3") }
 }
 dependencies {
@@ -87,6 +88,8 @@ dependencies {
     implementation("org.json:json:20240303")
     implementation("org.jmdns:jmdns:3.6.1")
     implementation("org.slf4j:slf4j-nop:2.0.16")
+    implementation("com.github.hypfvieh:dbus-java-core:5.2.0")
+    implementation("com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.0")
     testImplementation("junit:junit:4.13.2")
 }
 compose.desktop {
@@ -100,7 +103,7 @@ compose.desktop {
             vendor = "Sumit Kumar"
             copyright = "Copyright 2026 Sumit Kumar"
             licenseFile.set(rootProject.file("LICENSE"))
-            modules("java.net.http", "java.prefs", "jdk.unsupported", "java.desktop", "java.logging")
+            modules("java.net.http", "java.prefs", "jdk.unsupported", "java.desktop", "java.logging", "jdk.security.auth")
             linux {
                 packageName = "presence"
                 debMaintainer = "akasumitlamba@users.noreply.github.com"
@@ -119,3 +122,6 @@ compose.desktop {
         }
     }
 }
+
+// UI rendering checks run without a native display on Linux and Windows runners.
+tasks.test { jvmArgs("-Djava.awt.headless=true") }

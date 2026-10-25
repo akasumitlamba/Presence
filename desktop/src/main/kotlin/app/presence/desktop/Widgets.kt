@@ -20,14 +20,13 @@ import java.time.ZoneId
     val t = T(resolveLang(app.repo.flag("language","system")))
     val dark = when(app.repo.flag("theme","system")) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
     PresenceTheme(dark,app.repo.flag("palette","grove")) {
-        Column(Modifier.fillMaxSize()) {
-        CompositionLocalProvider(LocalUiText provides t) { chrome() }
-        Surface(Modifier.weight(1f)) {
+        Box(Modifier.fillMaxSize()) {
+        Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when(kind) {
                     "timer" -> {
                         val s = app.center.snap()
-                        Text(s.projectName.ifBlank { "Presence" },style = MaterialTheme.typography.titleLarge)
+                        Text(s.projectName.ifBlank { "Presence" },Modifier.padding(end = 108.dp),style = MaterialTheme.typography.titleLarge)
                         val g = app.repo.globals()
                         val shown = if(s.status == "idle") { if(g.countUp) 0L else stretchLengths(g.workMillis,stretchCount(g.shortCount,g.longCount)).first() } else displayMillis(s,System.currentTimeMillis(),monotonicMillis())
                         Text(clockDigits(shown),style = MaterialTheme.typography.displayMedium)
@@ -37,7 +36,7 @@ import java.time.ZoneId
                         }
                     }
                     "stats" -> {
-                        Text(t.today,style = MaterialTheme.typography.titleLarge)
+                        Text(t.today,Modifier.padding(end = 108.dp),style = MaterialTheme.typography.titleLarge)
                         val zone = ZoneId.systemDefault(); val hour = app.repo.globals().dayStart
                         val today = dayKey(System.currentTimeMillis(),zone,hour)
                         Text(clockWords(dayTotals(rows,listOf(today),zone,hour).single()),style = MaterialTheme.typography.displayMedium)
@@ -46,12 +45,12 @@ import java.time.ZoneId
                     "streak" -> {
                         val zone = ZoneId.systemDefault(); val hour = app.repo.globals().dayStart
                         val count = streakDays(rows,System.currentTimeMillis(),zone,hour)
-                        Text(t.streak,style = MaterialTheme.typography.titleLarge)
+                        Text(t.streak,Modifier.padding(end = 108.dp),style = MaterialTheme.typography.titleLarge)
                         Text(count.toString(),style = MaterialTheme.typography.displayMedium)
                         Text(t.streakLine(count,loggedToday(rows,System.currentTimeMillis(),zone,hour)))
                     }
                     "todos" -> {
-                        Text(t.todos,style = MaterialTheme.typography.titleLarge)
+                        Text(t.todos,Modifier.padding(end = 108.dp),style = MaterialTheme.typography.titleLarge)
                         rows.alive(KIND_LOCAL).filter { it.id.startsWith("todo:") }.sortedBy { it.f("sort").toLongOrNull() ?: it.updatedAt }.forEach { todo ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(todo.f("done") == "1", { app.repo.setTodoDone(todo.id.removePrefix("todo:"),it) })
@@ -64,6 +63,7 @@ import java.time.ZoneId
                 if(tick < 0) Text("")
             }
         }
+        Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) { CompositionLocalProvider(LocalUiText provides t) { chrome() } }
         }
     }
 }
