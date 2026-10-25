@@ -1,5 +1,7 @@
 Presence Desktop 2.2.1 for Windows and Linux. Every feature is free; there are no paid plans.
 
+- Balanced task choices and period selectors, full-width project creation, equal Stats columns/actions, and tag scrolling buttons shared with Android.
+- Rounded icons with an alpha-only mask to remove white edge fringes.
 - Windows `.exe` installer, Debian/Ubuntu `.deb`, and Linux `.flatpak` bundle, with Java included.
 - UI and timer controls built directly from Android's source, including its eleven palettes, seven languages, text sizes and introduction.
 - Projects, ordering, tasks, tags and filters, goals/deadlines and daily targets; local todos.

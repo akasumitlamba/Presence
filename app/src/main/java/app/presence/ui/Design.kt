@@ -1,6 +1,11 @@
 package app.presence.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -159,4 +164,48 @@ internal fun PresenceList(
                 androidx.compose.ui.geometry.Size(2.dp.toPx(),thumb), androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()))
         }
     }, verticalArrangement = verticalArrangement, contentPadding = contentPadding, content = content)
+}
+
+/** Equal cells, centered incomplete rows, and no label-dependent sizing. */
+@Composable
+internal fun BalancedChoices(options: List<Pair<String?, String>>, selected: String?, maxColumns: Int = 2, onSelect: (String?) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val minimum = if (maxColumns == 4) 72.dp else 140.dp
+        val capacity = ((maxWidth + 8.dp) / (minimum + 8.dp)).toInt().coerceAtLeast(1)
+        val columns = minOf(maxColumns, options.size.coerceAtLeast(1), if (maxColumns == 4 && capacity == 3) 2 else capacity)
+        val cellWidth = (maxWidth - 8.dp * (columns - 1)) / columns
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.chunked(columns).forEach { row ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                    row.forEach { (id, title) ->
+                        Surface(onClick = { onSelect(id) }, modifier = Modifier.width(cellWidth).fillMaxHeight(), shape = RoundedCornerShape(12.dp),
+                            color = if (selected == id) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (selected == id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
+                            Box(Modifier.heightIn(min = 56.dp).padding(12.dp), contentAlignment = Alignment.Center) {
+                                Text(title, textAlign = androidx.compose.ui.text.style.TextAlign.Center, style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Touch/trackpad scrolling plus explicit controls for pointer and keyboard users. */
+@Composable
+internal fun TagStrip(options: List<Pair<String?, String>>, selected: String?, previous: String, next: String, onSelect: (String?) -> Unit) {
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        IconButton({ scope.launch { scroll.animateScrollTo((scroll.value - scroll.viewportSize).coerceAtLeast(0)) } }, enabled = scroll.canScrollBackward) {
+            Icon(Icons.Outlined.ChevronLeft, previous)
+        }
+        Row(Modifier.weight(1f).horizontalScroll(scroll), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            options.forEach { (id, title) -> PresenceChip(selected == id, { onSelect(id) }, { Text(title, maxLines = 1) }) }
+        }
+        IconButton({ scope.launch { scroll.animateScrollTo((scroll.value + scroll.viewportSize).coerceAtMost(scroll.maxValue)) } }, enabled = scroll.canScrollForward) {
+            Icon(Icons.Outlined.ChevronRight, next)
+        }
+    }
 }

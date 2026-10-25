@@ -37,10 +37,16 @@ val generateDesktopIcons by tasks.registering {
             val g = image.createGraphics()
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON)
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-            g.color = Color.WHITE
-            g.fill(RoundRectangle2D.Float(0f,0f,size.toFloat(),size.toFloat(),size*0.42f,size*0.42f))
-            g.composite = AlphaComposite.SrcIn
             g.drawImage(source,0,0,size,size,null)
+            val mask = BufferedImage(size,size,BufferedImage.TYPE_INT_ARGB)
+            mask.createGraphics().apply {
+                setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON)
+                color = Color.WHITE
+                fill(RoundRectangle2D.Float(0f,0f,size.toFloat(),size.toFloat(),size*0.42f,size*0.42f))
+                dispose()
+            }
+            g.composite = AlphaComposite.DstIn
+            g.drawImage(mask,0,0,null)
             g.dispose()
             return image
         }

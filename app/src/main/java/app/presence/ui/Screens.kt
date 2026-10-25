@@ -436,8 +436,8 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                     DropdownMenuItem(text = { Text(t.newProject) }, onClick = { projectMenu = false; creating = true })
                 }
             }
-            if (!open && tasks.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                tasks.forEach { item -> PresenceChip(item.id == taskId, { if (!open) taskId = if (taskId == item.id) null else item.id }, { Text(item.f("title")) }) }
+            if (!open && tasks.isNotEmpty()) BalancedChoices(tasks.map { it.id to it.f("title") }, taskId) { id ->
+                taskId = if (taskId == id) null else id
             }
             if (open && snap.taskTitle.isNotBlank()) Text(snap.taskTitle, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -448,7 +448,7 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                         "awaiting" -> app.center.start(snap.awaitingKind.ifBlank { "focus" }, project, task)
                         else -> if (project != null) app.center.start("focus", project, task) else { actionError = t.needProject; creating = projects.isEmpty() }
                     }
-                } }, enabled = true, modifier = Modifier.weight(1.25f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                } }, enabled = true, modifier = Modifier.weight(1f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
                     Text(if (snap.status == "running") t.pause else t.play, maxLines = 2, textAlign = TextAlign.Center)
                 }
                 if (!open && project != null) TonalButton({ act { app.center.start("track", project, task) } }, Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
@@ -560,12 +560,11 @@ private fun ProjectsPage(
     val visible = projects.filter { filter == null || it.f("tags").split(",").contains(filter) }
     val list: @Composable (Modifier) -> Unit = { modifier ->
         Column(modifier.padding(LocalUiLayout.current.margin), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            PresenceButton(onClick = { creating = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+            PresenceButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                 Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.newProject)
             }
-            if (tags.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PresenceChip(filter == null, { filter = null }, { Text(t.all) })
-                tags.forEach { tag -> PresenceChip(filter == tag.id, { filter = if (filter == tag.id) null else tag.id }, { Text(tag.f("name")) }) }
+            if (tags.isNotEmpty()) TagStrip(listOf(null to t.all) + tags.map { it.id to it.f("name") }, filter, t.previous, t.next) { id ->
+                filter = if (filter == id) null else id
             }
             if (visible.isEmpty()) Text(t.emptyProjects, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PresenceList(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -782,10 +781,9 @@ private fun ProjectDetail(
         }
         item(key = "task-header") {
             SectionCard(t.tasks) {
-                TonalButton({ newTask = true }) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.newTask) }
-                if (tags.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PresenceChip(taskFilter == null, { taskFilter = null }, { Text(t.all) })
-                    tags.forEach { tag -> PresenceChip(taskFilter == tag.id, { taskFilter = if (taskFilter == tag.id) null else tag.id }, { Text(tag.f("name")) }) }
+                TonalButton({ newTask = true }, Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.newTask) }
+                if (tags.isNotEmpty()) TagStrip(listOf(null to t.all) + tags.map { it.id to it.f("name") }, taskFilter, t.previous, t.next) { id ->
+                    taskFilter = if (taskFilter == id) null else id
                 }
                 if (shownTasks.isEmpty()) Text(t.emptyTasks, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1089,8 +1087,8 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         SectionCard(modifier = modifier) {
             Text(selectedDay.format(dateFormat), style = MaterialTheme.typography.titleLarge)
             Metric(t.focusTime, clockWords(dayTotals(rows, listOf(selectedDay), zone, dayStart).single()))
-            PresenceButton({ add() }) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.manual) }
-            TextButton({ share() }) { Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text("${t.share} · ${listOf(t.today,t.week,t.month,t.year)[range]}") }
+            PresenceButton({ add() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.manual) }
+            TextButton({ share() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text("${t.share} · ${listOf(t.today,t.week,t.month,t.year)[range]}") }
             Text(t.onlyFocus, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (note.isNotEmpty()) Text(note, color = MaterialTheme.colorScheme.error)
         }
@@ -1098,8 +1096,8 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
     PresenceList(Modifier.fillMaxSize().padding(horizontal = LocalUiLayout.current.margin), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item(key = "period") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(t.today,t.week,t.month,t.year).forEachIndexed { i,title -> PresenceChip(range == i, { range = i; pickedSlice = -1 }, { Text(title) }) }
+                BalancedChoices(listOf(t.today,t.week,t.month,t.year).mapIndexed { i, title -> i.toString() to title }, range.toString(), maxColumns = 4) { id ->
+                    range = id!!.toInt(); pickedSlice = -1
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ navigate(-1) }) { Icon(Icons.Outlined.ChevronLeft, t.previous) }
@@ -1110,7 +1108,7 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         }
         item(key = "charts") {
             if (wide) Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                chart(Modifier.weight(1.2f).fillMaxHeight())
+                chart(Modifier.weight(1f).fillMaxHeight())
                 projectChart(Modifier.weight(1f).fillMaxHeight())
             } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { chart(Modifier); projectChart(Modifier) }
         }
@@ -1118,21 +1116,21 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             Text(t.streakLine(streakDays(rows, System.currentTimeMillis(), zone, dayStart), loggedToday(rows, System.currentTimeMillis(), zone, dayStart)), style = MaterialTheme.typography.titleMedium)
         } }
         item(key = "actions") {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton({ share() }) { Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text("${t.share} · ${listOf(t.today,t.week,t.month,t.year)[range]}") }
-                TonalButton({ add() }) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.manual) }
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TonalButton({ share() }, Modifier.weight(1f).fillMaxHeight()) { Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text("${t.share} · ${listOf(t.today,t.week,t.month,t.year)[range]}") }
+                TonalButton({ add() }, Modifier.weight(1f).fillMaxHeight()) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.manual) }
             }
         }
         item(key = "totals") {
             Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                SectionCard(modifier = Modifier.weight(1f).fillMaxHeight()) { Metric(t.focusTime, clockWords(total)) }
-                SectionCard(modifier = Modifier.weight(1f).fillMaxHeight()) { Metric(t.sessions, count.toString()) }
+                SectionCard(modifier = Modifier.weight(1f).fillMaxHeight()) { Metric(t.focusTime, clockWords(total), Modifier.fillMaxWidth(), centered = true) }
+                SectionCard(modifier = Modifier.weight(1f).fillMaxHeight()) { Metric(t.sessions, count.toString(), Modifier.fillMaxWidth(), centered = true) }
             }
         }
         item(key = "calendar") {
             val calendar: @Composable (Modifier) -> Unit = { modifier -> SectionCard(modifier = modifier) { CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it; anchor = it; pickedBar = -1 }) } }
             if (wide) Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                calendar(Modifier.weight(1.2f).fillMaxHeight())
+                calendar(Modifier.weight(1f).fillMaxHeight())
                 dayDetail(Modifier.weight(1f).fillMaxHeight())
             } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { calendar(Modifier); dayDetail(Modifier) }
         }
@@ -1875,7 +1873,7 @@ private fun TonalButton(
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun PresenceChip(
+internal fun PresenceChip(
     selected: Boolean,
     onClick: () -> Unit,
     label: @Composable () -> Unit,
