@@ -1,188 +1,108 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="dark" data-palette="grove">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Presence</title>
-  <meta name="description" content="Presence is a focus timer for Android. Download the app and keep sessions on your phone.">
-  <link rel="icon" href="mark.png" type="image/png">
-  <style>
-    @font-face {
-      font-family: "Source Sans 3";
-      src: url("app/src/main/res/font/source_sans_3_regular.ttf") format("truetype");
-      font-weight: 400;
-      font-style: normal;
-      font-display: block;
-    }
-    @font-face {
-      font-family: "Source Sans 3";
-      src: url("app/src/main/res/font/source_sans_3_semibold.ttf") format("truetype");
-      font-weight: 600;
-      font-style: normal;
-      font-display: block;
-    }
-
-    :root {
-      --ink: #143028;
-      --paper: #F3F6F4;
-      --leaf: #1F8A62;
-      --secondary: #3E5248;
-      --hairline: #D5E0DA;
-    }
-
-    * { box-sizing: border-box; }
-
-    html { background: var(--paper); }
-
-    body {
-      margin: 0;
-      background: var(--paper);
-      color: var(--ink);
-      font-family: "Source Sans 3", sans-serif;
-      font-weight: 400;
-      font-size: 1.125rem;
-      line-height: 1.45;
-      text-align: left;
-    }
-
-    header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem 1.25rem;
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--hairline);
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 1.75rem;
-      font-weight: 600;
-      line-height: 1.2;
-    }
-
-    h2 {
-      margin: 2rem 0 0.75rem;
-      font-size: 1.35rem;
-      font-weight: 600;
-      line-height: 1.25;
-    }
-
-    .download {
-      display: inline-block;
-      background: var(--leaf);
-      color: var(--paper);
-      font-weight: 600;
-      font-size: 1.05rem;
-      line-height: 1.2;
-      text-decoration: none;
-      padding: 0.7rem 1rem;
-    }
-
-    .download:focus-visible {
-      outline: 2px solid var(--ink);
-      outline-offset: 3px;
-    }
-
-    main {
-      padding: 1.5rem 1.5rem 3rem;
-    }
-
-    .lead {
-      display: flex;
-      align-items: flex-start;
-      gap: 2rem;
-    }
-
-    .lead p,
-    ol,
-    dl {
-      max-width: 62ch;
-    }
-
-    .lead p {
-      margin: 0;
-      flex: 1 1 16rem;
-    }
-
-    .lead img {
-      width: 11rem;
-      height: auto;
-      flex: 0 0 auto;
-    }
-
-    ol {
-      margin: 0;
-      padding-left: 1.25rem;
-    }
-
-    li { margin: 0.35rem 0; }
-
-    dl { margin: 0; }
-
-    dt {
-      margin-top: 0.9rem;
-      padding-top: 0.9rem;
-      border-top: 1px solid var(--hairline);
-      font-weight: 600;
-    }
-
-    dt:first-of-type {
-      margin-top: 0;
-      padding-top: 0;
-      border-top: none;
-    }
-
-    dd {
-      margin: 0.2rem 0 0;
-      color: var(--secondary);
-    }
-
-    @media (max-width: 42rem) {
-      .lead { flex-direction: column; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-    }
-  </style>
+  <meta name="theme-color" content="#111315">
+  <title>Presence — Make time for one thing.</title>
+  <meta name="description" content="A quiet, offline focus timer for Android. Plan your work, take proper breaks, and keep your data on your devices. Free and open source.">
+  <meta property="og:title" content="Presence — Make time for one thing.">
+  <meta property="og:description" content="An offline focus timer for Android. Your work, your rhythm, your space.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://akasumitlamba.github.io/Presence/">
+  <meta property="og:image" content="https://akasumitlamba.github.io/Presence/assets/presence.png">
+  <link rel="canonical" href="https://akasumitlamba.github.io/Presence/">
+  <link rel="icon" type="image/png" href="assets/presence.png">
+  <link rel="apple-touch-icon" href="assets/presence.png">
+  <link rel="preload" href="assets/fonts/presence-web-sans-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>Presence</h1>
-    <a class="download" href="https://github.com/akasumitlamba/Presence/releases/download/v2.1.0/presence.apk">Download Presence</a>
-  </header>
-  <main>
-    <div class="lead">
-      <p>Presence is a focus timer for a phone. The session, the list, and the streak stay on the device.</p>
-      <img src="mark.png" width="175" height="214" alt="">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v12H3Z"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="14" r="8"/><path d="M9 2h6m-3 4V2m7 6 2-2m-9 4v5l3 2"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V13m8 7V5m8 15V9M2 22h20"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0m-11 4a6 6 0 0 1 8 0"/><circle cx="12" cy="20" r=".6"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="m7 7-5 5 5 5m10-10 5 5-5 5M14 3l-4 18"/></symbol>
+  </svg>
+
+  <header class="site-header wrap">
+    <a class="brand" href="#" aria-label="Presence home"><img src="assets/presence.png" width="36" height="36" alt=""><span>Presence</span></a>
+    <nav aria-label="Main navigation"><a href="#rhythm">How it works</a><a href="#themes">Themes</a><a href="#offline">Offline, always</a></nav>
+    <div class="header-actions">
+      <button class="icon-button" id="appearance-toggle" type="button" aria-label="Switch to light appearance" hidden><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg></button>
+      <a class="button button-small" href="#download">Get the app</a>
     </div>
+  </header>
 
-    <h2>Install</h2>
-    <ol>
-      <li>Allow your browser to download the file.</li>
-      <li>Allow your phone to install it.</li>
-      <li>Open Presence.</li>
-    </ol>
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="intro-line"><span class="small-dot" aria-hidden="true"></span> A quiet focus timer for Android</p>
+        <h1 id="hero-title">Make time<br>for one thing.</h1>
+        <p class="hero-description">A little structure for your attention. Work in focused stretches, take a proper break, and come back ready.</p>
+        <div class="hero-actions"><a class="button" href="https://github.com/akasumitlamba/Presence/releases/latest/download/presence.apk"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download for Android</a><a class="text-link" href="https://github.com/akasumitlamba/Presence">Explore the source <svg class="icon" aria-hidden="true"><use href="#i-code"/></svg></a></div>
+        <p class="download-note">Android 8.0+ <span aria-hidden="true">·</span> Free &amp; open source <span aria-hidden="true">·</span> No account</p>
+      </div>
+      <figure class="timer-preview" aria-labelledby="preview-title">
+        <figcaption class="preview-heading"><span id="preview-title">A moment of focus</span><span class="preview-tag">Interactive preview</span></figcaption>
+        <div class="dial">
+          <svg viewBox="0 0 400 390" class="dial-svg" aria-hidden="true">
+            <circle class="dial-track" cx="200" cy="184" r="148"/>
+            <circle class="dial-progress" id="dial-progress" cx="200" cy="184" r="148" transform="rotate(-90 200 184)"/>
+            <g class="session-arcs" id="session-arcs">
+              <path class="current" d="M54.5 268A168 168 0 0 0 142.5 341.9"/>
+              <path d="M147.8 343.7A168 168 0 0 0 252.2 343.7"/>
+              <path d="M257.5 341.9A168 168 0 0 0 345.5 268"/>
+            </g>
+          </svg>
+          <div class="dial-copy"><span id="preview-phase">Focus</span><span class="time" id="preview-time" role="timer" aria-live="off" aria-label="Focus time remaining">00:20</span><span class="cycle" id="preview-cycle">Stretch 1 of 3</span></div>
+        </div>
+        <div class="preview-controls" id="preview-controls" hidden><button class="button" id="preview-continue" type="button">Continue</button><button class="button button-tonal" id="preview-stop" type="button" disabled>Stop</button><button class="button button-tonal" id="preview-skip" type="button" disabled>Skip</button></div>
+        <p class="preview-status" id="preview-status" role="status">A 20-second preview. Your real focus sessions live in the app.</p>
+        <noscript><p class="preview-status">Enable JavaScript to try the timer and theme previews. The app download works without it.</p></noscript>
+      </figure>
+    </section>
 
-    <h2>What it does</h2>
-    <dl>
-      <dt>Timer</dt>
-      <dd>Focus, a short rest, and a long rest. Start or pause a session.</dd>
-      <dt>Todos</dt>
-      <dd>Add an item, mark it complete, or delete it.</dd>
-      <dt>Streak</dt>
-      <dd>The days in a row you have logged time.</dd>
-      <dt>Widgets</dt>
-      <dd>Session, stats, streak, and todos on the home screen. The session widget can start or pause.</dd>
-      <dt>Reminders</dt>
-      <dd>A daily reminder and a streak reminder, each at a time you set.</dd>
-      <dt>On-device</dt>
-      <dd>Projects, sessions, and todos stay on the phone.</dd>
-      <dt>No account</dt>
-      <dd>There is nothing to sign in to.</dd>
-    </dl>
+    <section class="rhythm wrap section" id="rhythm" aria-labelledby="rhythm-title">
+      <div class="section-heading"><h2 id="rhythm-title">Find a rhythm.<br>Keep coming back.</h2><p>Presence gives your work a beginning, a little breathing room, and a place to see what you’ve done.</p></div>
+      <div class="rhythm-grid">
+        <article><span class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg></span><h3>One project. A clear plan.</h3><p>Choose what matters next. Set your total work time and breaks; Presence divides it into equal focus stretches. Keep tasks, tags, and a deadline close by.</p></article>
+        <article><span class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg></span><h3>Focus, then breathe.</h3><p>Continue, pause, stop, or move to the next stretch. The timer keeps time in the background. Pauses and breaks stay out of your focus total.</p></article>
+        <article><span class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg></span><h3>Small efforts add up.</h3><p>See your days, weeks, and projects in simple charts. Build a streak, keep an independent todo list, and bring your progress to your home screen with widgets.</p></article>
+      </div>
+    </section>
+
+    <section class="themes-section section" id="themes" aria-labelledby="themes-title">
+      <div class="wrap">
+        <div class="section-heading"><div><p class="section-note">A space that feels like yours</p><h2 id="themes-title">Your kind of quiet.</h2></div><p>Eleven palettes, light and dark. Try them here—the app and its widgets share the same sense of calm.</p></div>
+        <div class="theme-workbench">
+          <div class="theme-toolbar"><p id="palette-description" role="status">Viewing Grove in dark</p><div class="appearance-options" role="group" aria-label="Website appearance" id="appearance-options" hidden><button type="button" data-appearance="light" aria-pressed="false">Light</button><button type="button" data-appearance="dark" aria-pressed="true">Dark</button><button type="button" data-appearance="system" aria-pressed="false">System</button></div></div>
+          <div class="swatches" role="group" aria-label="Choose a website palette" id="palette-options" hidden>
+            <button type="button" data-palette="grove" aria-pressed="true"><span style="--swatch:#A9C7B5"></span>Grove</button><button type="button" data-palette="harbor" aria-pressed="false"><span style="--swatch:#8DA9C4"></span>Harbor</button><button type="button" data-palette="dusk" aria-pressed="false"><span style="--swatch:#B09AC2"></span>Dusk</button><button type="button" data-palette="slate" aria-pressed="false"><span style="--swatch:#A4B0BA"></span>Slate</button><button type="button" data-palette="berry" aria-pressed="false"><span style="--swatch:#CF9AA7"></span>Berry</button><button type="button" data-palette="amber" aria-pressed="false"><span style="--swatch:#CFB78E"></span>Amber</button><button type="button" data-palette="moss" aria-pressed="false"><span style="--swatch:#A8B596"></span>Moss</button><button type="button" data-palette="iris" aria-pressed="false"><span style="--swatch:#AAA6D4"></span>Iris</button><button type="button" data-palette="copper" aria-pressed="false"><span style="--swatch:#CEA58D"></span>Copper</button><button type="button" data-palette="tide" aria-pressed="false"><span style="--swatch:#8FB6BE"></span>Tide</button><button type="button" data-palette="ink" aria-pressed="false"><span style="--swatch:#A4ACC2"></span>Ink</button>
+          </div>
+          <div class="plan-preview"><div><span class="section-note">A plan for your project</span><h3>One hour of focus.</h3><p>Three equal stretches, with two short breaks between them.</p></div><div class="focus-plan" aria-label="20 minutes focus, 5 minutes break, 20 minutes focus, 5 minutes break, 20 minutes focus"><span>20<small>min focus</small></span><i>5m<br>break</i><span>20<small>min focus</small></span><i>5m<br>break</i><span>20<small>min focus</small></span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="offline-section section wrap" id="offline" aria-labelledby="offline-title">
+      <div class="offline-visual" aria-hidden="true"><div class="device"><div class="device-top"></div><svg class="icon"><use href="#i-check"/></svg><span>On your device</span></div><div class="local-link"><span></span><svg class="icon"><use href="#i-wifi"/></svg><span></span><small>Local Wi-Fi</small></div><div class="device second-device"><div class="device-top"></div><svg class="icon"><use href="#i-check"/></svg><span>Your other device</span></div></div>
+      <div class="offline-copy"><p class="section-note">Offline by design</p><h2 id="offline-title">Your time.<br>Your devices.</h2><p>Focus works without an internet connection. Your projects, sessions, and todos stay on your phone or tablet.</p><p>Want to use two devices? Pair them with a four-digit code on the same Wi-Fi network. They sync locally, without a cloud account.</p><ul class="plain-list"><li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>No sign-in, subscriptions, or analytics</li><li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>JSON backups and CSV exports</li><li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Open source, under Apache 2.0</li></ul></div>
+    </section>
+
+    <section class="download-section section wrap" id="download" aria-labelledby="download-title">
+      <div class="download-copy"><img src="assets/presence.png" width="64" height="64" alt="" loading="lazy"><h2 id="download-title">A little more<br>presence in your day.</h2><p>Start with one project and one stretch.</p><a class="button" href="https://github.com/akasumitlamba/Presence/releases/latest/download/presence.apk"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download for Android</a><p class="download-note">Android 8.0 or newer. Direct APK download.</p><a class="text-link" href="https://github.com/akasumitlamba/Presence/releases/latest">Release notes &amp; checksums</a></div>
+      <div class="practical"><h3>A few practical things</h3><details open><summary>How do I install it?</summary><div><ol><li>Download the APK on your Android device.</li><li>Open it. If Android asks, allow installation from the browser or file app you’re using.</li><li>Install Presence, open it, and follow the introduction.</li></ol><p>For updates, install the new APK over the existing app to keep your data.</p></div></details><details><summary>Does Wi-Fi sync need the internet?</summary><div><p>No. Both devices need the same local network for pairing and sync. The timer, projects, statistics, and todos work offline even when Wi-Fi is off.</p></div></details><details><summary>Is everything free?</summary><div><p>Yes. Every feature is available, including themes, widgets, backups, and local sync. There is no premium tier or account.</p></div></details><details><summary>Where can I report a problem?</summary><div><p><a href="https://github.com/akasumitlamba/Presence/issues">Open an issue on GitHub</a> with your Android version and what happened.</p></div></details></div>
+    </section>
   </main>
+
+  <footer class="site-footer wrap"><a class="brand" href="#"><img src="assets/presence.png" width="28" height="28" alt=""><span>Presence</span></a><p>Made for the time you choose to give.</p><nav aria-label="Footer navigation"><a href="https://github.com/akasumitlamba/Presence">GitHub</a><a href="https://github.com/akasumitlamba/Presence/blob/main/LICENSE">License</a><a href="#offline">Privacy</a></nav><small>© 2026 Sumit Kumar. Website runs without analytics.</small></footer>
 </body>
 </html>

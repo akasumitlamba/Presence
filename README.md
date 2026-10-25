@@ -1,82 +1,104 @@
 # Presence
 
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" alt="Presence app icon">
+<img src="assets/presence.png" width="88" height="88" alt="Presence app icon">
 
-Presence is a focus timer for Android. It is the time you give to one piece of work. Projects, tasks, and sessions stay on the phone. There is no account.
+**Make time for one thing.** Presence is an offline focus timer and time tracker for Android. Plan a project, work in focused stretches, and take proper breaks. Your projects and sessions stay on your devices.
 
-[Download Presence](https://github.com/akasumitlamba/Presence/releases/download/v2.2.1/presence.apk)
+[Website](https://akasumitlamba.github.io/Presence/) · [Download the Android APK](https://github.com/akasumitlamba/Presence/releases/latest/download/presence.apk) · [Release notes](https://github.com/akasumitlamba/Presence/releases/latest)
 
-The current release is version 2.2.1, versionCode 15. Package name: `app.presence`.
+Android **8.0+** · Package `app.presence` · Free and open source
 
-## Install
+## What’s inside
 
-1. Download the APK from the link above.
-2. On the phone, allow the browser or the file app to install it.
-3. Open the file and install Presence.
+- Focus cycles and free time tracking, with Continue, Pause, Stop, and Skip controls.
+- Total work time divided into equal stretches, configurable short/long breaks, countdown or count-up display, and optional automatic continuation.
+- Projects, tasks, tags, goals and deadlines, plus an independent todo list.
+- Calendar-based statistics, project charts, streaks, manual entries, and sharing.
+- Background timing, notifications, alarms, reminders, and ambient/custom sounds.
+- Four home-screen widgets: timer, statistics, streak, and todos.
+- Eleven palettes, light/dark/system appearance, adjustable text, and seven languages. Widgets follow your appearance settings.
+- Local Wi-Fi pairing and sync, JSON backup import/export, CSV session export, and optional removable-card database storage.
 
-A later copy installs over this one when it is signed with the same key. The app does not use Continue Store billing. Every feature is free.
+There are no accounts, subscriptions, analytics, or cloud services. Android cloud backup is disabled. Network access is used for local-device sync.
 
-## Timer
+## Install and start
 
-Work time is one duration for a project. The default is one hour. That duration is split into equal stretches. Stretch count is the short-break count plus the long-break count plus one. One hour with two short breaks is three stretches of twenty minutes. Any other duration splits the same way.
+1. Download `presence.apk` from the [latest release](https://github.com/akasumitlamba/Presence/releases/latest).
+2. Open it on your Android device. If Android asks, allow installation from the browser or file app you’re using.
+3. Open Presence and follow the introduction. It is also available in **Settings → About → How to use Presence**.
+4. Create a project, select it on Timer, and choose **Continue**.
 
-Continue starts a sitting. When a stretch ends, the next break starts by itself. When the break ends, the next stretch waits until you press Continue. After the last stretch, the sitting is idle. Stop ends the sitting, including one that is waiting after a break.
+Install updates over the existing app using the same signing certificate to preserve local data. Releases currently use the project’s existing Android debug signing certificate; every feature is available without Play Store billing. Release assets include `SHA256SUMS` for verification.
 
-Pause is on the timer. Time spent paused is not work and is not a break. It is not written into stats. While a sitting is open, the bottom of the timer shows how many pauses happened and how long they added up to. That note disappears when the sitting ends.
+### Focus plans
 
-The main ring shows the current phase. A separate segmented arc follows its lower edge, with one segment per computed focus stretch. The center shows the time left in the current phase. Under that, smaller, is the time already spent working on this project.
+Set the total work duration and the number of short and long breaks. The number of focus stretches is the number of breaks plus one. For example, 60 minutes of work with two short breaks produces three 20-minute focus stretches. Break time is additional to that work duration.
 
-The project control is one dropdown. It lists the projects you already have, and the last entry is New project. A project is a name. You can delete it. Projects are not grouped.
+**Continue** starts or resumes; **Pause** temporarily pauses; **Stop** saves elapsed work and ends the session; **Skip** moves to the next phase. Work, pauses, and breaks are accounted for separately. Open sessions retain the plan they started with. Only focus and tracking time count toward statistics and goals.
 
-Duration fields are hours, minutes, and seconds. Work time, short breaks, and long breaks sit in their own sections. Edits are saved as you make them.
+The thick ring shows the current phase, and the curved segments beneath it show your focus stretches. Portrait windows use centered bottom navigation; landscape windows use a centered side rail.
 
-## Also on the phone
+### Pair your devices
 
-Appearance can follow the system, or stay light or dark. The color themes are Grove, Harbor, Dusk, Slate, Berry, Amber, Moss, Iris, Copper, Tide, and Ink. Text size is a setting, and so is the hour the day starts.
+1. Connect both devices to the same local Wi-Fi network.
+2. On one device, open **Settings → Pair on Wi-Fi → Show code**.
+3. On the other, enter that four-digit code. It expires after ten minutes or when pairing succeeds.
 
-Todos can be added, completed, and deleted.
+Internet access is not required. Android 13+ may ask for nearby Wi-Fi permission. Presence does not request location access.
 
-A daily reminder and a streak reminder each have a time you set.
+Projects, tasks, tags, completed sessions, goals, and timer settings sync. Appearance, language, reminders, todos, and custom audio remain local to each device. Active timers are not overwritten by sync.
 
-Home-screen widgets cover the session, stats, the streak, and todos. The session widget can continue or pause; when idle, it opens the timer to choose a project. All four widgets follow the app’s palette and light/dark/system mode.
+## Build the Android app
 
-The timer keeps going when you leave Presence, lock the screen, or the process is killed. The notification shows the time left. When a phase ends, the alarm plays even if Presence is not in front.
+Use **JDK 17** and **Android SDK 35**, including build-tools 35. Set `ANDROID_HOME` to the SDK, or set `sdk.dir` in a local `local.properties` file.
 
-Stats cover today, the week, the month, and the year, with a bar chart, a pie chart, and a month calendar. You can share a summary and add a past stretch by hand.
-
-Settings has a row named SD card. If the phone has a removable card, Presence can keep its database in the app’s own folder on that card. It does not ask for access to every file on the card.
-
-Languages are English, Turkish, Spanish, Portuguese, French, Japanese, and Korean. The first launch follows the phone when that language is one of these. Otherwise it starts in English.
-
-Every portrait window uses a centered bottom navigation bar. Landscape windows use a vertically centered side rail. Wider windows can place the timer beside its controls and a project list beside its detail. The timer project name is prominent, with an adjacent dropdown arrow; Logged, Pauses and Streak have equally sized, centered columns. Statistics charts appear directly below the period controls.
-
-Background sounds are rain, brook, and hearth. The alarm can be a bell, a pulse, or a sound copied from the phone.
-
-## On the device
-
-There is nothing to sign in to, and there is no cloud account. Android cloud backup is off. You can save a backup of projects, tasks, and sessions, save a CSV of sessions, and bring a backup back in.
-
-Two phones on the same Wi-Fi can pair. One shows a four-digit code. The other enters it. The code lasts ten minutes, or until the pair succeeds. After that, the phones remember each other and sync while Presence is running. No server is involved.
-
-What syncs: projects, tasks, tags, completed sessions, goals, and timer settings. What stays on each phone: appearance, text size, language, reminders, todos, and a custom alarm file. If the same record changes on both phones, the later edit wins. A running timer is not overwritten and is not counted twice.
-
-## Build
-
-Install JDK 17 or newer and Android SDK 35, including the platform and build-tools 35. Point `ANDROID_HOME` at the SDK, or put `sdk.dir` in `local.properties`.
-
-```bash
-./gradlew :core:test
-./gradlew assembleDebug
+```sh
+./gradlew :core:test :app:assembleDebug :app:lintDebug
 ```
 
-The APK is `app/build/outputs/apk/debug/app-debug.apk`.
+Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
-Source Sans 3 is bundled for the app and the widgets. Its license is in `third_party/source-sans-3/LICENSE.md`.
+```sh
+./gradlew :app:assembleRelease
+```
+
+Release APK: `app/build/outputs/apk/release/app-release.apk`. The version is defined in [app/build.gradle.kts](app/build.gradle.kts).
+
+## Website and GitHub Pages
+
+The one-page site is served **directly from the repository root**. It uses plain HTML, CSS, and JavaScript, with no build step, framework, third-party scripts, or analytics.
+
+| File | Purpose |
+| --- | --- |
+| `index.html` | Accessible page content, download links, installation FAQ |
+| `styles.css` | Responsive layouts and Presence-inspired visual system |
+| `script.js` | Timer demo and palette/appearance previews |
+| `assets/` | Local app icon and bundled fonts with their license |
+| `.nojekyll` | Keeps GitHub Pages serving these static files directly |
+
+In repository **Settings → Pages**, the publishing source is **Deploy from a branch**, branch **main**, folder **/ (root)**. The public address is [akasumitlamba.github.io/Presence](https://akasumitlamba.github.io/Presence/).
+
+Preview locally from this directory:
+
+```sh
+python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000/`. All site asset URLs are relative so they also work under GitHub Pages’ `/Presence/` path.
+
+The browser timer is an explicitly labeled **20-second demonstration**, not a recorder for your Android sessions. It does not save or transmit work. The website can remember palette/appearance preferences in local browser storage; it still works when storage is blocked. Downloads, navigation, and the FAQ work without JavaScript.
+
+See [website design and verification](docs/website.md) and [Android UI verification](docs/ui-follow-up.md).
+
+## Repository structure
+
+- `app/` — native Android application, Compose UI, storage, timer runtime, sync, and widgets.
+- `core/` — timer rules, statistics, sync/merge logic, and core tests.
+- `docs/` — implementation and validation notes.
+- Root HTML/CSS/JS and `assets/` — public GitHub Pages website.
 
 ## License
 
-Copyright 2026 Sumit Kumar.
+Copyright 2026 Sumit Kumar. App and website code are licensed under [Apache License 2.0](LICENSE).
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE), or http://www.apache.org/licenses/LICENSE-2.0.
-
-The app retains all 11 palettes. A first-launch guide can be reopened in Settings > About, and startup uses the app logo. Streak counters are visible in Timer and Stats.
+The application bundles Source Sans 3 by Adobe under the SIL Open Font License. The website uses renamed, subsetted copies of that typeface. See [font credits](assets/fonts/README.md), [website font license](assets/fonts/LICENSE.md), and [original font license](third_party/source-sans-3/LICENSE.md).
