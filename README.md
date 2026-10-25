@@ -6,7 +6,7 @@ Presence is a focus timer for Android. It is the time you give to one piece of w
 
 [Download Presence](https://github.com/akasumitlamba/Presence/releases/download/v2.2.1/presence.apk)
 
-The current release is version 2.2.1, versionCode 14. Package name: `app.presence`.
+The current release is version 2.2.1, versionCode 15. Package name: `app.presence`.
 
 ## Install
 

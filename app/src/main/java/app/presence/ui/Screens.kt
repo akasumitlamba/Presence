@@ -1020,8 +1020,8 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), t.share))
     }
     fun add() { if (selectedDay > today) note = t.future else { manual = true; note = "" } }
-    val chart: @Composable () -> Unit = {
-        SectionCard(t.byDay) {
+    val chart: @Composable (Modifier) -> Unit = { modifier ->
+        SectionCard(t.byDay, modifier = modifier) {
             Text("${t.week}: ${label(week.first, week.second)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val maxMinutes = (kotlin.math.ceil((bars.maxOrNull() ?: 0L) / 600_000.0).toInt() * 10).coerceAtLeast(10)
             val accent = MaterialTheme.colorScheme.primary
@@ -1051,8 +1051,8 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             if (pickedBar in days.indices) Text("${days[pickedBar].format(dateFormat)}: ${clockWords(bars[pickedBar])}", style = MaterialTheme.typography.bodyMedium)
         }
     }
-    val projectChart: @Composable () -> Unit = {
-        SectionCard(t.byProject) {
+    val projectChart: @Composable (Modifier) -> Unit = { modifier ->
+        SectionCard(t.byProject, modifier = modifier) {
             val colors = slices.map { slice -> chartColor(rows.alive(KIND_PROJECT).find { it.id == slice.id }?.f("color") ?: "14614A", MaterialTheme.colorScheme.background.isDark()) }
             val track = MaterialTheme.colorScheme.outlineVariant
             Box(Modifier.fillMaxWidth().height(196.dp), contentAlignment = Alignment.Center) {
@@ -1085,8 +1085,8 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         }
     }
     val selectedSessions = closed.filter { it.f("startedAt").toLongOrNull()?.let { dayKey(it, zone, dayStart) == selectedDay } == true }.sortedBy { it.f("startedAt").toLongOrNull() }
-    val dayDetail: @Composable () -> Unit = {
-        SectionCard {
+    val dayDetail: @Composable (Modifier) -> Unit = { modifier ->
+        SectionCard(modifier = modifier) {
             Text(selectedDay.format(dateFormat), style = MaterialTheme.typography.titleLarge)
             Metric(t.focusTime, clockWords(dayTotals(rows, listOf(selectedDay), zone, dayStart).single()))
             PresenceButton({ add() }) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(t.manual) }
@@ -1109,9 +1109,10 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             }
         }
         item(key = "charts") {
-            if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.weight(1.2f)) { chart() }; Box(Modifier.weight(1f)) { projectChart() }
-            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { chart(); projectChart() }
+            if (wide) Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                chart(Modifier.weight(1.2f).fillMaxHeight())
+                projectChart(Modifier.weight(1f).fillMaxHeight())
+            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { chart(Modifier); projectChart(Modifier) }
         }
         item(key = "streak") { SectionCard(t.streak) {
             Text(t.streakLine(streakDays(rows, System.currentTimeMillis(), zone, dayStart), loggedToday(rows, System.currentTimeMillis(), zone, dayStart)), style = MaterialTheme.typography.titleMedium)
@@ -1123,16 +1124,17 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             }
         }
         item(key = "totals") {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                SectionCard(modifier = Modifier.weight(1f)) { Metric(t.focusTime, clockWords(total)) }
-                SectionCard(modifier = Modifier.weight(1f)) { Metric(t.sessions, count.toString()) }
+            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                SectionCard(modifier = Modifier.weight(1f).fillMaxHeight()) { Metric(t.focusTime, clockWords(total)) }
+                SectionCard(modifier = Modifier.weight(1f).fillMaxHeight()) { Metric(t.sessions, count.toString()) }
             }
         }
         item(key = "calendar") {
-            val calendar: @Composable () -> Unit = { SectionCard { CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it; anchor = it; pickedBar = -1 }) } }
-            if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.weight(1.2f)) { calendar() }; Box(Modifier.weight(1f)) { dayDetail() }
-            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { calendar(); dayDetail() }
+            val calendar: @Composable (Modifier) -> Unit = { modifier -> SectionCard(modifier = modifier) { CalendarBlock(t, rows, month, selectedDay, zone, dayStart, { month = it }, { selectedDay = it; anchor = it; pickedBar = -1 }) } }
+            if (wide) Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                calendar(Modifier.weight(1.2f).fillMaxHeight())
+                dayDetail(Modifier.weight(1f).fillMaxHeight())
+            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { calendar(Modifier); dayDetail(Modifier) }
         }
         items(selectedSessions, key = { "session-${it.id}" }) { rec ->
             SectionCard { Text(rec.f("projectName").ifBlank { t.unlabeled }); Text("${phase(t,rec.f("kind"))}: ${clockWords(sessionCountedMillis(rec))}", color = MaterialTheme.colorScheme.onSurfaceVariant) }

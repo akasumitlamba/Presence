@@ -23,3 +23,7 @@ Actual local screenshots are in `artifacts/ui-redesign/2.2.1/` (ignored artifact
 Portrait windows, including tablets, use a horizontally centered bottom navigation group capped at 640dp. Landscape windows use a vertically centered side rail that scrolls if its destinations exceed the available height. Orientation is resolved from the current safe window dimensions. The straight stretch indicators are replaced with a 120-degree segmented arc concentric with the lower part of the timer ring. Segment count, completion and current-position colors still come from the existing timer state; all palettes remain supported.
 
 The timer project selector now uses a prominent centered project name with its dropdown arrow adjacent. Logged, Pauses and Streak use equally sized, centered columns. Stats charts appear immediately after the period/date controls, before streak, actions and summary cards.
+
+## Build 15 refinement
+
+Side-by-side Stats cards share their row’s natural maximum height, including both chart cards, summary cards, and calendar/detail cards. Content stays aligned at the top. Stacked portrait cards keep their natural heights; no fixed portrait card height is imposed.
