@@ -46,6 +46,7 @@ s=section(s,'    val introPrefs = remember', '    var tick by rememberSaveable',
 s=section(s,'    val permission = rememberLauncher', '    val back: (() -> Unit)?', '')
 # Opt-in screen selection for the existing isolated preview capture mode.
 s=s.replace('mutableStateOf("timer")', 'mutableStateOf(System.getenv("PRESENCE_PREVIEW_PAGE")?.takeIf { System.getenv("PRESENCE_PREVIEW_DIR") != null && it in setOf("timer", "projects", "stats", "settings") } ?: "timer")')
+s=s.replace('import app.presence.R\n', '').replace('R.drawable.ic_launcher_fg', '"presence.png"')
 s=s.replace('SystemClock.elapsedRealtime()', 'monotonicMillis()')
 s=s.replace('app.presence.data.Globals', 'DesktopGlobals')
 s=s.replace('            android.util.Log.e("Presence", "Timer action failed", error)', '            error.printStackTrace()')

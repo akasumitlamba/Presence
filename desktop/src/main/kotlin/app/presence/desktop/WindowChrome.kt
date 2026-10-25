@@ -21,14 +21,14 @@ import androidx.compose.ui.window.WindowState
 
 /** App-owned window controls, with the same palette as the screen below. */
 @Composable
-internal fun WindowScope.PresenceTitleBar(state: WindowState, close: () -> Unit) {
+internal fun WindowScope.PresenceTitleBar(state: WindowState, close: () -> Unit, showIcon: Boolean = true) {
     val t = LocalUiText.current
     val maximized = state.placement == WindowPlacement.Maximized
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
             WindowDraggableArea(Modifier.weight(1f).fillMaxHeight()) {
                 Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Image(painterResource("presence.png"), null, Modifier.size(24.dp))
+                    if (showIcon) Image(painterResource("presence.png"), null, Modifier.size(24.dp))
                     Text("Presence", style = MaterialTheme.typography.titleSmall, maxLines = 1)
                 }
             }

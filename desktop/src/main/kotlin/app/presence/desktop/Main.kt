@@ -67,7 +67,7 @@ fun main() {
             title = "Presence", icon = painterResource("presence.png"), state = mainState,
             onKeyEvent = { event -> if(event.type == KeyEventType.KeyUp && event.key == Key.Escape && app.back != null) { app.back?.invoke(); true } else false }) {
             window.minimumSize = Dimension(700,608)
-            PresenceRoot(app) { PresenceTitleBar(mainState, closeMain) }
+            PresenceRoot(app) { PresenceTitleBar(mainState, closeMain, showIcon = false) }
             if(exiting) {
                 val t = T(resolveLang(store.flag("language","system")))
                 AlertDialog(onDismissRequest = { exiting = false }, title = { Text("Quit Presence?") },

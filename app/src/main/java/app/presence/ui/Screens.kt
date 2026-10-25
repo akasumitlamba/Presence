@@ -16,6 +16,9 @@ import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import app.presence.R
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -336,7 +339,9 @@ private fun destinations(t: T) = listOf(
 @Composable
 private fun Rail(t: T, tab: String, onTab: (String) -> Unit) {
     val short = LocalUiLayout.current.short
-    BoxWithConstraints(Modifier.width(if (short) 72.dp else 80.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+    Column(Modifier.width(if (short) 72.dp else 80.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow), horizontalAlignment = Alignment.CenterHorizontally) {
+        Image(painterResource(R.drawable.ic_launcher_fg), "Presence", Modifier.padding(vertical = 12.dp).size(if (short) 32.dp else 40.dp))
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().presenceScroll(rememberScrollState()).heightIn(min = maxHeight).padding(vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(if (short) 0.dp else 8.dp, Alignment.CenterVertically)) {
@@ -353,6 +358,7 @@ private fun Rail(t: T, tab: String, onTab: (String) -> Unit) {
                 }
             }
         }
+    }
     }
 }
 
@@ -484,9 +490,9 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
             if (!immersive && !androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) Text(t.notificationsOff, style = MaterialTheme.typography.bodyMedium)
         }
     }
-    BoxWithConstraints(Modifier.fillMaxSize().padding(LocalUiLayout.current.margin).padding(bottom = 48.dp)) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(LocalUiLayout.current.margin)) {
         val columns = maxWidth >= 620.dp
-        val ringSize = if (columns) minOf(360.dp, maxHeight - 8.dp, maxWidth * 0.45f) else minOf(320.dp, maxWidth, maxHeight * 0.5f)
+        val ringSize = if (columns) minOf(360.dp, maxHeight - 56.dp, maxWidth * 0.45f) else minOf(320.dp, maxWidth, (maxHeight - 48.dp) * 0.5f)
         val ring: @Composable () -> Unit = {
             Box(Modifier.size(ringSize.coerceAtLeast(120.dp)), contentAlignment = Alignment.Center) {
                 val accent = MaterialTheme.colorScheme.primary
@@ -528,16 +534,16 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                 }
             }
         }
-        if (maxHeight < 180.dp) Column(Modifier.fillMaxSize().presenceScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (maxHeight < 180.dp) Column(Modifier.fillMaxSize().padding(bottom = 48.dp).presenceScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${phase(t, snap.kind)} · ${clockDigits(face)}", style = MaterialTheme.typography.titleLarge)
             controls()
-        } else if (columns) Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        } else if (columns) Row(Modifier.fillMaxSize().padding(bottom = 48.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { ring() }
             Column(Modifier.weight(1f).widthIn(max = 440.dp).presenceScroll(rememberScrollState())) { controls() }
-        } else Column(Modifier.fillMaxSize().presenceScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, if (immersive) Alignment.CenterVertically else Alignment.Top)) {
+        } else Column(Modifier.fillMaxSize().padding(bottom = 48.dp).presenceScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, if (immersive) Alignment.CenterVertically else Alignment.Top)) {
             ring(); controls(); Spacer(Modifier.height(8.dp))
         }
-        IconButton(onFullscreen, Modifier.align(Alignment.BottomEnd).offset(y = 48.dp)) {
+        IconButton(onFullscreen, Modifier.align(Alignment.BottomEnd)) {
             Icon(if (immersive) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen, if (immersive) t.exitFullscreen else t.fullscreen)
         }
     }
