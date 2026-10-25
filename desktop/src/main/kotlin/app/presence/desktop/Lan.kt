@@ -88,10 +88,12 @@ class DesktopLan(private val store: Store) : AutoCloseable {
         }
         message = if (result.ok) "Paired with ${result.peerName}. Data synced." else "Pairing failed: ${result.reason}"
     }
-    fun sync(peerId: String? = null) = execute { syncKnown(peerId) }
+    fun sync(peerId: String? = null) = execute { message = "Syncing…"; syncKnown(peerId) }
     private fun syncKnown(peerId: String? = null) {
         if (closed) return
-        peers().filter { store.tokenFor(it.id) != null && (peerId == null || it.id == peerId) }.forEach {
+        val paired = peers().filter { store.tokenFor(it.id) != null && (peerId == null || it.id == peerId) }
+        if(peerId != null && paired.isEmpty()) { message = "not_visible"; return }
+        paired.forEach {
             val result = node.sync(it.host, it.port, it.id)
             if(result.ok) store.touchPeer(it.id)
             message = if (result.ok) "Synced with ${it.name}" else "Could not sync with ${it.name}: ${result.reason}"

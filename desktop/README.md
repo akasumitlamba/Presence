@@ -49,7 +49,7 @@ flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flath
 flatpak install --user flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 ./gradlew -PdesktopOnly :desktop:createDistributable
 flatpak-builder --user --force-clean --disable-rofiles-fuse --repo=flatpak-repo flatpak-build desktop/packaging/app.presence.Presence.yml
-flatpak build-bundle flatpak-repo Presence-2.2.1-linux-x86_64.flatpak app.presence.Presence
+flatpak build-bundle --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo flatpak-repo Presence-2.2.1-linux-x86_64.flatpak app.presence.Presence
 ```
 
 The manifest composes metadata with `appstreamcli`, which the supported SDK provides. Flatpak has LAN access for Wi-Fi sync, display/GPU/sound access, and home/mounted-drive access for native file selection, backup and removable storage. App data defaults to its private XDG data directory.

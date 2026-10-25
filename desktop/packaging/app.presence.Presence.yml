@@ -25,7 +25,8 @@ modules:
       - chmod +x /app/bin/presence /app/presence/bin/Presence
       - install -Dm644 app.presence.Presence.desktop /app/share/applications/app.presence.Presence.desktop
       - install -Dm644 app.presence.Presence.metainfo.xml /app/share/metainfo/app.presence.Presence.metainfo.xml
-      - install -Dm644 presence.png /app/share/icons/hicolor/192x192/apps/app.presence.Presence.png
+      - install -Dm644 presence-128.png /app/share/icons/hicolor/128x128/apps/app.presence.Presence.png
+      - install -Dm644 presence-64.png /app/share/icons/hicolor/64x64/apps/app.presence.Presence.png
       - appstreamcli compose --components=app.presence.Presence --prefix=/ --origin=app.presence.Presence --result-root=/app --data-dir=/app/share/app-info/xmls /app
     sources:
       - type: dir
@@ -35,4 +36,6 @@ modules:
       - type: file
         path: app.presence.Presence.metainfo.xml
       - type: file
-        path: ../../assets/presence.png
+        path: ../build/generated/desktopIcons/presence-128.png
+      - type: file
+        path: ../build/generated/desktopIcons/presence-64.png

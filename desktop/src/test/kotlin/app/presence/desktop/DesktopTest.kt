@@ -81,7 +81,9 @@ class DesktopTest {
         a.setPref("daily_on","1")
         a.setPref("alarm","custom")
         val b = store()
-        b.mergeFrom(decodeBackup(encodeBackup(a.snapshot()))!!)
+        val imported = decodeBackup(encodeBackup(a.snapshot()))!!
+        val newer = b.snapshot().maxOf { it.updatedAt } + 1000
+        b.mergeFrom(imported.map { it.copy(updatedAt = newer) })
         assertTrue(b.globals().dailyOn)
         assertEquals("chime",b.globals().alarm)
     }
