@@ -34,6 +34,11 @@ class Store(initialDirectory: Path = activeDataDirectory()) : Catalog {
             put(Rec(KIND_LOCAL, "device", System.currentTimeMillis(), id, false,
                 mapOf("id" to id, "name" to "Presence • ${System.getProperty("os.name")}")))
         }
+        val existing = rows.filter { it.kind == KIND_PREF }.map { it.id }.toSet()
+        val now = System.currentTimeMillis()
+        val missing = ANDROID_DEFAULT_PREFS.filterKeys { it !in existing }.map { (key,value) -> Rec(KIND_PREF,key,now,deviceId(),false,mapOf("value" to value)) }
+        if(missing.isNotEmpty()) put(*missing.toTypedArray())
+        if(rows.none { it.kind == KIND_LOCAL && it.id == "flags" }) write(KIND_LOCAL,"flags",mapOf("theme" to "system","palette" to "grove","language" to "system","text" to "standard"))
         changes.value = rows
     }
     fun observe(): StateFlow<List<Rec>> = changes
@@ -100,11 +105,12 @@ class Store(initialDirectory: Path = activeDataDirectory()) : Catalog {
     fun deleteTodo(id: String) { snapshot().find { it.kind == KIND_LOCAL && it.id == "todo:$id" }?.let { write(it.kind,it.id,it.body,true) } }
     fun forgetPeer(id: String) { snapshot().find { it.kind == KIND_LOCAL && it.id == "peer:$id" }?.let { write(it.kind,it.id,it.body,true) } }
     fun touchPeer(id: String) { snapshot().find { it.kind == KIND_LOCAL && it.id == "peer:$id" && !it.deleted }?.let { write(it.kind,it.id,it.body + ("lastSync" to System.currentTimeMillis().toString())) } }
-    fun resetSettings() {
-        mapOf("focus_min" to "25","short_min" to "5","long_min" to "15","cycles" to "4","work_sec" to "3600","short_sec" to "300","long_sec" to "900","short_count" to "2","long_count" to "0","count_up" to "0","auto_start" to "0","day_start" to "0","daily_hour" to "9","daily_minute" to "0","streak_hour" to "20","streak_minute" to "0").forEach { (key,value) -> setPref(key,value) }
+    @Synchronized fun resetSettings() {
+        val now = System.currentTimeMillis()
+        put(*ANDROID_RESET_PREFS.map { (key,value) -> Rec(KIND_PREF,key,now,deviceId(),false,mapOf("value" to value)) }.toTypedArray())
         updateFlags { it["theme"] = "system"; it["palette"] = "grove" }
     }
-    fun globals(): DesktopGlobals {
+    @Synchronized fun globals(): DesktopGlobals {
         fun n(key: String, fallback: Int) = pref(key,fallback.toString()).toIntOrNull() ?: fallback
         fun sec(key: String, fallback: Long) = (pref(key,fallback.toString()).toLongOrNull() ?: fallback).coerceIn(1,356400) * 1000
         return DesktopGlobals(n("focus_min",25).coerceIn(1,180),n("short_min",5).coerceIn(1,60),n("long_min",15).coerceIn(1,120),n("cycles",4).coerceIn(1,12),pref("count_up","0") == "1",pref("auto_start","0") == "1",n("day_start",0).coerceIn(0,6),pref("alarm","chime"),pref("background","off"),n("bg_volume",40).coerceIn(0,100),pref("daily_on","0") == "1",n("daily_hour",9).coerceIn(0,23),n("daily_minute",0).coerceIn(0,59),pref("streak_on","0") == "1",n("streak_hour",20).coerceIn(0,23),n("streak_minute",0).coerceIn(0,59),sec("work_sec",3600),n("short_count",2).coerceIn(0,24),n("long_count",0).coerceIn(0,24),sec("short_sec",300),sec("long_sec",900))

@@ -80,3 +80,6 @@ globals=repo[repo.index('data class Globals('):repo.index('\ndata class Todo(')]
 print('Adapted Android UI: screens, design, translations, typography, palettes, introduction and settings model')
 s=(root/'app/src/main/java/app/presence/timer/Center.kt').read_text(encoding='utf-8').replace('package app.presence.timer','package app.presence.desktop').replace('import app.presence.data.Repo\n','').replace('private val repo: Repo','private val repo: Store').replace('android.os.SystemClock.elapsedRealtime()', 'monotonicMillis()')
 (out/'Center.kt').write_text(s,encoding='utf-8')
+defaults=repo[repo.index('            val defaults = mapOf('):repo.index('            val missing = defaults')]
+reset=repo[repo.index('            val prefs = listOf('):repo.index('            dao.upsert(',repo.index('    fun resetSettings()'))]
+(out/'Defaults.kt').write_text('package app.presence.desktop\n\n'+defaults.replace('val defaults','val ANDROID_DEFAULT_PREFS')+'\n'+reset.replace('val prefs','val ANDROID_RESET_PREFS'),encoding='utf-8')
