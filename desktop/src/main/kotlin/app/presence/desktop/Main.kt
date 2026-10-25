@@ -101,8 +101,8 @@ fun main() {
     val task = rows.alive(KIND_TASK).find { it.id == taskId }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FilterChip(!tracking, { if (!busy) tracking = false }, { Text("Focus plan") }, enabled = !busy)
-            FilterChip(tracking, { if (!busy) tracking = true }, { Text("Free tracking") }, enabled = !busy)
+            FilterChip(!tracking, { if (!busy) tracking = false }, { Text("Focus timer") }, enabled = !busy)
+            FilterChip(tracking, { if (!busy) tracking = true }, { Text("Stopwatch") }, enabled = !busy)
         }
         if (busy) Text(snap.projectName.ifEmpty { "No project" }, style = MaterialTheme.typography.titleLarge)
         else {
@@ -262,8 +262,8 @@ fun main() {
             }
         }
         HorizontalDivider()
-        Text("Focus plan", style = MaterialTheme.typography.titleLarge)
-        Text("Changes apply to your next plan. Work is divided equally between focus stretches.")
+        Text("Work and breaks", style = MaterialTheme.typography.titleLarge)
+        Text("Changes apply to your next timer. Work is divided equally between focus stretches.")
         NumberSetting(store, "Total work (minutes)", "work_sec", "3600", 60, 1..5940)
         NumberSetting(store, "Short break (minutes)", "short_sec", "300", 60, 1..5940)
         NumberSetting(store, "Long break (minutes)", "long_sec", "900", 60, 1..5940)

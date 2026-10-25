@@ -1,8 +1,8 @@
-First desktop preview of Presence for Windows and Linux.
+First desktop preview of Presence for Windows and Linux. Every feature is free; there are no paid plans.
 
 - Windows .exe installer, Debian/Ubuntu .deb package, and Linux .flatpak bundle; Java is included.
 - Android's eleven light/dark palettes and Source Sans 3 typography, with desktop navigation and resizable layouts.
-- Focus plans, free tracking, pause/resume/stop/skip, projects, tasks, goals/deadlines, local todos, statistics, CSV export and JSON backup import/export.
+- Focus timers, stopwatch tracking, pause/resume/stop/skip, projects, tasks, goals/deadlines, local todos, statistics, CSV export and JSON backup import/export.
 - Local Wi-Fi pairing and automatic sync using the same Kotlin protocol and merge engine as Android 2.2.1. DNS-SD discovery supports Wi-Fi and Ethernet. Appearance and todos stay local; active sessions are protected.
 
 Install one package for your platform. For Flatpak use `flatpak install --user ./Presence-2.2.1-linux-x86_64.flatpak`.
