@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:padding="8dp" android:clipToPadding="false" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent">
+    <FrameLayout android:id="@android:id/background" android:layout_width="match_parent" android:layout_height="match_parent">
     <ImageView android:id="@+id/widget_background" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_bg" android:importantForAccessibility="no" />
 <LinearLayout
     android:layout_width="match_parent"
@@ -10,6 +11,7 @@
 
     <ImageView
         android:id="@+id/widget_icon"
+        android:tint="@color/widget_accent"
         android:layout_width="28dp"
         android:layout_height="28dp"
         android:layout_marginEnd="10dp"
@@ -40,4 +42,5 @@
     </LinearLayout>
 </LinearLayout>
 
+</FrameLayout>
 </FrameLayout>

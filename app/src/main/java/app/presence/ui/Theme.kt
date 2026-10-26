@@ -392,9 +392,10 @@ private val Type = Typography(
     labelSmall = face(FontWeight.Medium, 11, 16),
 )
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PresenceTheme(dark: Boolean = isSystemInDarkTheme(), palette: String = "grove", textScale: Float = 1f, content: @Composable () -> Unit) {
-    val scheme = scheme(dark, paletteOf(palette, dark))
+    val scheme = platformColorScheme(androidx.compose.ui.platform.LocalContext.current, dark, palette)
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -414,8 +415,10 @@ fun PresenceTheme(dark: Boolean = isSystemInDarkTheme(), palette: String = "grov
         bodyLarge = scaled(Type.bodyLarge), bodyMedium = scaled(Type.bodyMedium), bodySmall = scaled(Type.bodySmall),
         labelLarge = scaled(Type.labelLarge), labelMedium = scaled(Type.labelMedium), labelSmall = scaled(Type.labelSmall),
     )
-    MaterialTheme(colorScheme = scheme, typography = typography, shapes = Shapes(
-        small = RoundedCornerShape(8.dp), medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp),
+    androidx.compose.material3.MaterialExpressiveTheme(colorScheme = scheme, typography = typography,
+        motionScheme = androidx.compose.material3.MotionScheme.expressive(), shapes = Shapes(
+        extraSmall = RoundedCornerShape(4.dp), small = RoundedCornerShape(8.dp),
+        medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp), extraLarge = RoundedCornerShape(28.dp),
     )) {
         CompositionLocalProvider(LocalContentColor provides scheme.onSurface, content = content)
     }
@@ -547,3 +550,11 @@ fun Color.isDark(): Boolean = luminance() < 0.45f
 
 /** Shared palette resolver for native widgets; no Compose runtime is required. */
 internal fun presenceColorScheme(dark: Boolean, palette: String) = scheme(dark, paletteOf(palette, dark))
+
+/** Expressive effects motion does not overshoot colors; honors platform duration scale. */
+@Composable
+internal fun motionColor(target: Color): Color = androidx.compose.animation.animateColorAsState(
+    targetValue = target,
+    animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+    label = "Material color",
+).value

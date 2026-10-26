@@ -179,7 +179,7 @@ class Repo(private val context: Context) : Catalog {
             )
             val map = (dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.toRec()?.body ?: emptyMap()).toMutableMap()
             map["theme"] = "system"
-            map["palette"] = "grove"
+            map["palette"] = "system"
             dao.upsert(listOf(Rec(KIND_LOCAL, "flags", now, writer, false, map).toEntity()))
         }
     }
@@ -235,7 +235,7 @@ class Repo(private val context: Context) : Catalog {
                             now,
                             writer,
                             false,
-                            mapOf("premium" to "0", "theme" to "system", "text" to "standard", "language" to "system", "palette" to "grove"),
+                            mapOf("premium" to "0", "theme" to "system", "text" to "standard", "language" to "system", "palette" to "system"),
                         ).toEntity(),
                     ),
                 )
@@ -243,7 +243,7 @@ class Repo(private val context: Context) : Catalog {
             val flagsRow = dao.all().firstOrNull { it.kind == KIND_LOCAL && it.id == "flags" }?.toRec()
             if (flagsRow != null && flagsRow.f("palette").isEmpty()) {
                 val body = flagsRow.body.toMutableMap()
-                body["palette"] = "grove"
+                body["palette"] = "system"
                 dao.upsert(listOf(flagsRow.copy(updatedAt = now, body = body).toEntity()))
             }
     }

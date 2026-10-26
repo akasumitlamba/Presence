@@ -1,7 +1,7 @@
 package app.presence.widget
 
 import androidx.compose.ui.graphics.toArgb
-import app.presence.ui.presenceColorScheme
+import app.presence.ui.platformColorScheme
 import app.presence.R
 import android.app.PendingIntent
 import android.content.Context
@@ -68,7 +68,11 @@ internal fun android.widget.RemoteViews.applyTheme(
         "light" -> false
         else -> context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
     }
-    val colors = presenceColorScheme(dark, flags["palette"] ?: "grove")
+    // Leave system resource references intact so launchers can recolor/reinflate
+    // immediately when wallpaper or day/night mode changes, without waiting for data refresh.
+    if (android.os.Build.VERSION.SDK_INT >= 31 && (flags["palette"] ?: "system") == "system" &&
+        flags["theme"] !in setOf("light", "dark")) return
+    val colors = platformColorScheme(context, dark, flags["palette"] ?: "system")
     setInt(R.id.widget_background, "setColorFilter", colors.surfaceContainer.toArgb())
     setInt(R.id.widget_icon, "setColorFilter", colors.primary.toArgb())
     text.forEach { setTextColor(it, colors.onSurface.toArgb()) }

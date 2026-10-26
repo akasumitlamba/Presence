@@ -1,22 +1,24 @@
 package app.presence.ui
 
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.outlined.ChevronLeft
-import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -32,8 +34,8 @@ import org.json.JSONObject
 
 internal data class UiLayout(val width: Dp = 360.dp, val height: Dp = 800.dp, val keyboard: Boolean = false) {
     val short get() = height < 480.dp
-    val rail get() = width > height
-    val twoPanes get() = width >= 900.dp && !short
+    val rail get() = width >= 600.dp || width > height
+    val twoPanes get() = width >= 840.dp && !short
     val margin get() = if (twoPanes) 24.dp else 16.dp
 }
 internal val LocalUiText = staticCompositionLocalOf { T("en") }
@@ -56,7 +58,7 @@ internal fun PageHeader(title: String, backLabel: String, onBack: (() -> Unit)? 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, backLabel) }
+        if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, backLabel) }
         Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -67,7 +69,7 @@ internal fun SectionCard(title: String? = null, modifier: Modifier = Modifier, s
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(spacing)) {
@@ -91,8 +93,8 @@ internal fun Metric(label: String, value: String, modifier: Modifier = Modifier,
 
 @Composable
 internal fun ActionRow(title: String, detail: String, icon: ImageVector, onClick: () -> Unit) {
-    Surface(onClick = onClick, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp)) {
-        Row(Modifier.heightIn(min = 56.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Surface(onClick = onClick, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+        Row(Modifier.heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.bodyLarge)
@@ -119,7 +121,7 @@ internal fun PresenceDialog(
         confirmButton = confirmButton, dismissButton = dismissButton,
         modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 16.dp),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-        shape = RoundedCornerShape(16.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.extraLarge, containerColor = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 0.dp,
     )
 }
@@ -178,8 +180,8 @@ internal fun BalancedChoices(options: List<Pair<String?, String>>, selected: Str
             options.chunked(columns).forEach { row ->
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
                     row.forEach { (id, title) ->
-                        Surface(onClick = { onSelect(id) }, modifier = Modifier.width(cellWidth).fillMaxHeight(), shape = RoundedCornerShape(12.dp),
-                            color = if (selected == id) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                        Surface(onClick = { onSelect(id) }, modifier = Modifier.width(cellWidth).fillMaxHeight(), shape = RoundedCornerShape(20.dp),
+                            color = motionColor(if (selected == id) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow),
                             border = BorderStroke(1.dp, if (selected == id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
                             Box(Modifier.heightIn(min = 56.dp).padding(12.dp), contentAlignment = Alignment.Center) {
                                 Text(title, textAlign = androidx.compose.ui.text.style.TextAlign.Center, style = MaterialTheme.typography.labelLarge)
@@ -199,13 +201,27 @@ internal fun TagStrip(options: List<Pair<String?, String>>, selected: String?, p
     val scope = rememberCoroutineScope()
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         IconButton({ scope.launch { scroll.animateScrollTo((scroll.value - scroll.viewportSize).coerceAtLeast(0)) } }, enabled = scroll.canScrollBackward) {
-            Icon(Icons.Outlined.ChevronLeft, previous)
+            Icon(Icons.Rounded.ChevronLeft, previous)
         }
         Row(Modifier.weight(1f).horizontalScroll(scroll), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             options.forEach { (id, title) -> PresenceChip(selected == id, { onSelect(id) }, { Text(title, maxLines = 1) }) }
         }
         IconButton({ scope.launch { scroll.animateScrollTo((scroll.value + scroll.viewportSize).coerceAtMost(scroll.maxValue)) } }, enabled = scroll.canScrollForward) {
-            Icon(Icons.Outlined.ChevronRight, next)
+            Icon(Icons.Rounded.ChevronRight, next)
         }
     }
 }
+
+/** A small, bounded response to a press, alongside Material's built-in ripple. */
+@Composable
+internal fun Modifier.materialPress(source: androidx.compose.foundation.interaction.MutableInteractionSource): Modifier {
+    val pressed by source.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        if (pressed) 0.97f else 1f,
+        MaterialTheme.motionScheme.fastSpatialSpec(), label = "Material press",
+    )
+    return this.then(Modifier.graphicsLayerMaterial(scale))
+}
+
+private fun Modifier.graphicsLayerMaterial(scale: Float): Modifier =
+    this.then(Modifier.graphicsLayer(scaleX = scale, scaleY = scale))

@@ -3,7 +3,7 @@
     android:description="@string/widget_streak_desc"
     android:initialLayout="@layout/widget_streak"
     android:minWidth="110dp"
-    android:minHeight="80dp"
+    android:minHeight="112dp"
     android:previewLayout="@layout/widget_streak"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="2"

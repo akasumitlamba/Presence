@@ -315,3 +315,16 @@
   render();
   ['appearance-toggle', 'appearance-options', 'palette-options', 'preview-controls'].forEach(id => { document.getElementById(id).hidden = false; });
 })();
+
+// Reveal only on entry, with a no-JavaScript and reduced-motion-safe baseline.
+if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('material-reveal');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, {threshold: 0.12});
+  document.querySelectorAll('.rhythm-grid article,.plan-preview,.download-section').forEach(node => observer.observe(node));
+}

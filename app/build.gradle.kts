@@ -10,13 +10,14 @@ plugins {
 
 android {
     namespace = "app.presence"
-    compileSdk = 35
+    compileSdkVersion("android-37.0")
 
     defaultConfig {
         applicationId = "app.presence"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = 22
         versionName = "1.1.1"
     }
 
@@ -62,11 +63,13 @@ android {
 }
 
 dependencies {
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     implementation(project(":core"))
-    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3:material3:1.5.0-beta02")
     implementation("androidx.compose.material3:material3-window-size-class")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.9.3")

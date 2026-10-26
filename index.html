@@ -15,8 +15,8 @@
   <link rel="icon" type="image/png" href="assets/presence.png">
   <link rel="apple-touch-icon" href="assets/presence.png">
   <link rel="preload" href="assets/fonts/presence-web-sans-regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=1.1.1">
-  <script src="script.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=1.1.1-material">
+  <script src="script.js?v=1.1.1-material" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -33,7 +33,7 @@
   </svg>
 
   <header class="site-header wrap">
-    <a class="brand" href="#" aria-label="Presence home"><img src="assets/presence.png" width="36" height="36" alt=""><span>Presence</span></a>
+    <a class="brand" href="#" aria-label="Presence home"><span class="brand-mark" aria-hidden="true"></span><span>Presence</span></a>
     <nav aria-label="Main navigation"><a href="#rhythm">How it works</a><a href="#themes">Themes</a><a href="#offline">Offline, always</a></nav>
     <div class="header-actions">
       <button class="icon-button" id="appearance-toggle" type="button" aria-label="Switch to light appearance" hidden><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg></button>
@@ -98,7 +98,7 @@
     </section>
 
     <section class="download-section section wrap" id="download" aria-labelledby="download-title">
-      <div class="download-copy"><img src="assets/presence.png" width="64" height="64" alt="" loading="lazy"><h2 id="download-title">A little more <br>presence in your day.</h2><p>Presence 1.1.1. One app for your phone, tablet and PC. Every feature is free.</p>
+      <div class="download-copy"><span class="brand-mark" aria-hidden="true"></span><h2 id="download-title">A little more <br>presence in your day.</h2><p>Presence 1.1.1. One app for your phone, tablet and PC. Every feature is free.</p>
         <div class="platform-downloads" aria-label="Download Presence 1.1.1">
           <a class="button" href="https://github.com/akasumitlamba/Presence/releases/latest/download/presence.apk">Android <span>APK · Android 8.0+</span></a>
           <a class="button" href="https://github.com/akasumitlamba/Presence/releases/latest/download/Presence-1.1.1.exe">Windows <span>EXE · x86-64</span></a>
@@ -110,6 +110,6 @@
     </section>
   </main>
 
-  <footer class="site-footer wrap"><a class="brand" href="#"><img src="assets/presence.png" width="28" height="28" alt=""><span>Presence</span></a><p>Made for the time you choose to give.</p><nav aria-label="Footer navigation"><a href="https://github.com/akasumitlamba/Presence">GitHub</a><a href="https://github.com/akasumitlamba/Presence/blob/main/LICENSE">License</a><a href="#offline">Privacy</a></nav><small>© 2026 Sumit Kumar. Website runs without analytics.</small></footer>
+  <footer class="site-footer wrap"><a class="brand" href="#"><span class="brand-mark" aria-hidden="true"></span><span>Presence</span></a><p>Made for the time you choose to give.</p><nav aria-label="Footer navigation"><a href="https://github.com/akasumitlamba/Presence">GitHub</a><a href="https://github.com/akasumitlamba/Presence/blob/main/LICENSE">License</a><a href="#offline">Privacy</a></nav><small>© 2026 Sumit Kumar. Website runs without analytics.</small></footer>
 </body>
 </html>

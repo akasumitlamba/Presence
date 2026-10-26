@@ -79,7 +79,7 @@ tasks.processResources {
 dependencies {
     implementation(project(":core"))
     implementation(compose.desktop.currentOs)
-    implementation(compose.material3)
+    implementation("org.jetbrains.compose.material3:material3:1.13.0-beta01")
     implementation(compose.materialIconsExtended)
     implementation("com.tianscar.javasound:javasound-aac:0.9.8")
     implementation("com.tianscar.javasound:javasound-flac:1.4.1")

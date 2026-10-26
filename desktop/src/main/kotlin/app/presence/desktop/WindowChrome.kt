@@ -36,7 +36,7 @@ internal fun PresenceWindowControls(state: WindowState, close: () -> Unit, compa
 
 internal val LocalHeaderDrag = androidx.compose.runtime.staticCompositionLocalOf<@Composable (Modifier, @Composable () -> Unit) -> Unit> { { modifier, content -> Box(modifier) { content() } } }
 
-@Composable internal fun PresenceBrand(modifier: Modifier) {
+@Composable internal fun PresenceBrand(modifier: Modifier, colorFilter: androidx.compose.ui.graphics.ColorFilter? = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary)) {
     val mark = androidx.compose.runtime.remember { androidx.compose.ui.res.loadImageBitmap(object {}.javaClass.getResourceAsStream("/presence-mark.png")!!) }
-    Image(mark, "Presence", modifier, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
+    Image(mark, "Presence", modifier, colorFilter = colorFilter, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
 }

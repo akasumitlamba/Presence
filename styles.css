@@ -9,3 +9,29 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.dial-progress{transition:none}}
 
 .platform-downloads{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-block:24px}.platform-downloads .button{display:flex;flex-direction:column;gap:4px;justify-content:center;text-align:center;min-height:88px;padding:16px 12px}.platform-downloads .button span{font-size:13px;font-weight:400}@media(max-width:360px){.platform-downloads{grid-template-columns:1fr}}
+
+/* Material You: tonal containers, deliberate shapes and responsive state layers. */
+:root{--motion-standard:cubic-bezier(.2,0,0,1);--container:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+body,.timer-preview,.plan-preview,.device,.button,.swatches button,.appearance-options button{transition:background-color 250ms var(--motion-standard),color 250ms var(--motion-standard),border-color 250ms var(--motion-standard),transform 180ms var(--motion-standard),box-shadow 180ms var(--motion-standard)}
+.button,.icon-button,.appearance-options,.appearance-options button{border-radius:999px}
+.button{min-height:48px;position:relative;isolation:isolate}.button:after,.icon-button:after{content:'';position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;pointer-events:none;transition:opacity 150ms var(--motion-standard)}
+.button:hover:after,.icon-button:hover:after{opacity:.08}.button:active:after,.icon-button:active:after{opacity:.12}.button:active,.icon-button:active,.swatches button:active{transform:scale(.97)}
+:where(a,button,summary):focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.timer-preview,.plan-preview{border-radius:28px;background:var(--container);border-color:transparent}
+.rhythm-grid{gap:16px}.rhythm-grid article{padding:28px;border-radius:28px;background:var(--container);border:0}
+.feature-icon{display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:18px;background:var(--soft);color:var(--accent)}
+.theme-toolbar{padding:20px;border-radius:28px;background:var(--container)}
+.swatches{gap:10px}.swatches button{border-radius:20px;padding:14px 8px}.swatches button[aria-pressed=true]{background:var(--soft)}
+.platform-downloads .button{border-radius:24px}.device{border-radius:28px;background:var(--container)}
+.site-header nav a{border-radius:999px;transition:background-color 180ms var(--motion-standard);padding-inline:12px}.site-header nav a:hover{background:var(--soft)}
+@keyframes material-enter{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:no-preference){.hero-copy,.timer-preview{animation:material-enter 500ms var(--motion-standard) both}.timer-preview{animation-delay:80ms}.material-reveal{animation:material-enter 450ms var(--motion-standard) both}}
+@media(max-width:760px){.rhythm-grid article{padding:24px}.site-header nav{gap:4px}.theme-toolbar{padding:16px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Recolor the original transparent Presence mark without altering its silhouette. */
+.brand-mark{display:inline-block;flex-shrink:0;width:36px;height:40px;background:var(--accent);-webkit-mask:url('mark.png') center/contain no-repeat;mask:url('mark.png') center/contain no-repeat;transition:background-color 250ms var(--motion-standard)}
+.download-copy>.brand-mark{width:56px;height:64px;margin-bottom:28px}.site-footer .brand-mark{width:28px;height:32px}
+@supports (animation-timing-function:linear(0,1)){
+  .button,.icon-button,.swatches button{transition-timing-function:var(--motion-standard),var(--motion-standard),var(--motion-standard),linear(0,.55 16%,.94 32%,1.035 46%,1.01 64%,1),var(--motion-standard)}
+}

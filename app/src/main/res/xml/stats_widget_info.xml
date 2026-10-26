@@ -3,7 +3,7 @@
     android:description="@string/widget_stats_desc"
     android:initialLayout="@layout/widget_stats"
     android:minWidth="180dp"
-    android:minHeight="80dp"
+    android:minHeight="112dp"
     android:previewLayout="@layout/widget_stats"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="3"

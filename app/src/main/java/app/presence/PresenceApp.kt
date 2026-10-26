@@ -57,6 +57,14 @@ class PresenceApp : Application() {
         repo = Repo(this)
         center = TimerCenter(repo) { step -> reactTo(step) }
         retryStartup()
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_WALLPAPER_CHANGED)
+        }
+        androidx.core.content.ContextCompat.registerReceiver(this, object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+                if (ready.isCompleted) HomeWidgets.update(this@PresenceApp)
+            }
+        }, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     private fun initialize() {

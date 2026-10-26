@@ -21,7 +21,7 @@ import java.time.ZoneId
     val dark = when(app.repo.flag("theme","system")) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
     PresenceTheme(dark,app.repo.flag("palette","grove")) {
         Box(Modifier.fillMaxSize()) {
-        Surface(Modifier.fillMaxSize()) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.extraLarge) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when(kind) {
                     "timer" -> {
