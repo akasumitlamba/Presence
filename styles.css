@@ -14,7 +14,8 @@
 :root{--motion-standard:cubic-bezier(.2,0,0,1);--container:color-mix(in srgb,var(--accent) 8%,var(--bg))}
 body,.timer-preview,.plan-preview,.device,.button,.swatches button,.appearance-options button{transition:background-color 250ms var(--motion-standard),color 250ms var(--motion-standard),border-color 250ms var(--motion-standard),transform 180ms var(--motion-standard),box-shadow 180ms var(--motion-standard)}
 .button,.icon-button,.appearance-options,.appearance-options button{border-radius:999px}
-.button{min-height:48px;position:relative;isolation:isolate}.button:after,.icon-button:after{content:'';position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;pointer-events:none;transition:opacity 150ms var(--motion-standard)}
+.button,.icon-button{position:relative;isolation:isolate}
+.button{min-height:48px}.button:after,.icon-button:after{content:'';position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;pointer-events:none;transition:opacity 150ms var(--motion-standard)}
 .button:hover:after,.icon-button:hover:after{opacity:.08}.button:active:after,.icon-button:active:after{opacity:.12}.button:active,.icon-button:active,.swatches button:active{transform:scale(.97)}
 :where(a,button,summary):focus-visible{outline:3px solid var(--accent);outline-offset:4px}
 .timer-preview,.plan-preview{border-radius:28px;background:var(--container);border-color:transparent}
