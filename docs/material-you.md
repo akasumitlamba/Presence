@@ -63,4 +63,27 @@ Actual previews use the original Presence asset and the implemented screens.
   The subsequent Android-only portrait/widget fixes were checked to leave the
   generated desktop Kotlin byte-for-byte unchanged.
 - Website phone and desktop widths were checked for horizontal overflow.
-- Release APK uses versionCode 24 and the verified existing tablet signing key.
+- Release APK uses versionCode 25 and the verified existing tablet signing key.
+
+
+## Adaptive layout follow-up (1.1.1)
+
+The shared stats screen has one manual-entry action, inside the selected day's
+card. The duplicate share/manual-action row was removed. Wide timer controls use
+their full column width with 24dp spacing and 56dp primary actions; stacked phone
+and portrait-tablet controls use compact spacing and retain scrolling. The clock
+size is unchanged.
+
+All eleven fixed dark palettes now have brighter accents and subtly tinted card
+surfaces. Light palettes, Android wallpaper colors, and the original logo shape
+remain intact. Website dark accents match the app; website cards use tonal
+surfaces and the focus timeline uses equal-sized cells with internal padding.
+
+Validation: 53 JVM tests passed; all four Android instrumentation cases passed
+in both light and dark on Android 17. Actual Android phone and portrait/landscape
+tablet layouts and desktop renders from 320px (large text) to 1920px were reviewed.
+Website overflow checks passed at 320, 375, 768, 1024, 1440, and 1920px; all eleven
+dark palettes meet 4.5:1 for primary button, body, and secondary text colors.
+Native package and launcher checks passed in
+[run 40329582839](https://github.com/akasumitlamba/Presence/actions/runs/40329582839).
+The physical tablet was not connected to ADB during this follow-up.
