@@ -494,7 +494,7 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize().padding(LocalUiLayout.current.margin)) {
-        val columns = maxWidth >= 620.dp
+        val columns = timerUsesColumns(maxWidth, maxHeight)
         val ringSize = if (columns) minOf(540.dp, maxHeight - 56.dp, maxWidth * 0.45f) else minOf(if (LocalUiLayout.current.width >= 600.dp) 460.dp else 360.dp, maxWidth, (maxHeight - 48.dp) * 0.5f)
         val ring: @Composable () -> Unit = {
             Box(Modifier.size(ringSize.coerceAtLeast(120.dp)), contentAlignment = Alignment.Center) {

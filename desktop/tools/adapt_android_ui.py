@@ -52,6 +52,8 @@ s=s.replace('import app.presence.R\n', '').replace('Image(painterResource(R.draw
 # Desktop uses maximize/restore, while Android owns immersive fullscreen.
 s=section(s,'                if (tab == "timer" && !pairing) IconButton(', '            }\n        }\n    }\n    // Keep the content/provider', '')
 s=s.replace('.widthIn(max = 1200.dp)', '')
+# Desktop keeps its verified side-by-side layout; Android adapts tall tablet windows.
+s=s.replace('timerUsesColumns(maxWidth, maxHeight)', 'maxWidth >= 620.dp')
 s=s.replace('minOf(540.dp, maxHeight - 56.dp, maxWidth * 0.45f)', 'minOf(640.dp, maxHeight - 72.dp, maxWidth * 0.45f)')
 s=s.replace('.coerceIn(36f, 84f)', '.coerceIn(36f, 144f)').replace('.coerceIn(28f, 60f)', '.coerceIn(28f, 104f)')
 s=s.replace('Modifier.width(320.dp)', 'Modifier.width((LocalUiLayout.current.width * 0.28f).coerceIn(320.dp, 440.dp))')

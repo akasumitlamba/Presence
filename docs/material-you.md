@@ -20,7 +20,7 @@ on press. Compose respects Android's system animator duration scale. Website
 motion is disabled under prefers-reduced-motion, and keyboard focus stays visible.
 
 Tablet navigation uses a rail at 600dp; expanded content uses two panes at 840dp.
-Short windows keep scrollable single-pane content. Window size, rather than a
+Short windows keep scrollable single-pane content. Tall Android tablet windows stack the timer above its controls, while wide windows keep the side-by-side arrangement. Window size, rather than a
 fixed device identity or orientation lock, controls layout. The desktop remains
 frameless with its existing integrated window controls and no timer fullscreen
 button. Android retains its existing immersive timer control.
@@ -49,3 +49,18 @@ Three concept boards were generated first with the built-in imagegen tool:
 The generated boards are design references only. Their invented logos, example
 content, decorative elements, and extra settings are not product requirements.
 Actual previews use the original Presence asset and the implemented screens.
+
+## Validation
+
+- 53 JVM tests passed, including timer/sync regressions, desktop menu placement,
+  and adaptive-layout cases.
+- Four Android instrumentation cases passed on Android 17 in light and dark
+  modes: wallpaper palette/fixed palette resolution, widget inflation/insets,
+  single-line timer actions, and tall/wide timer layout decisions. Widget grids
+  were rendered from the actual XML for visual inspection.
+- Windows and Linux packages and launcher smoke checks passed in
+  [run 40322779988](https://github.com/akasumitlamba/Presence/actions/runs/40322779988).
+  The subsequent Android-only portrait/widget fixes were checked to leave the
+  generated desktop Kotlin byte-for-byte unchanged.
+- Website phone and desktop widths were checked for horizontal overflow.
+- Release APK uses versionCode 24 and the verified existing tablet signing key.

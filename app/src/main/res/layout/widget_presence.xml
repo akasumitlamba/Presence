@@ -18,7 +18,7 @@
                 </FrameLayout>
                 <FrameLayout android:layout_width="72dp" android:layout_height="48dp">
                     <ImageView android:id="@+id/widget_action_background" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/widget_action_bg" android:scaleType="fitXY" android:importantForAccessibility="no" />
-                    <TextView android:id="@+id/widget_action" android:layout_width="match_parent" android:layout_height="match_parent" android:fontFamily="@font/source_sans_3" android:gravity="center" android:paddingHorizontal="8dp" android:textColor="@color/widget_on_accent" android:textSize="15sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/widget_action" android:layout_width="match_parent" android:layout_height="match_parent" android:fontFamily="@font/source_sans_3" android:gravity="center" android:paddingHorizontal="8dp" android:textColor="@color/widget_on_accent" android:textSize="15sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12sp" android:autoSizeMaxTextSize="15sp" android:autoSizeStepGranularity="1sp" />
                 </FrameLayout>
             </LinearLayout>
         </LinearLayout>
