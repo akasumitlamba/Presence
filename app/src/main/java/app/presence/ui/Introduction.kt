@@ -13,7 +13,7 @@ import app.presence.R
 @Composable
 internal fun StartupContent() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Image(painterResource(R.drawable.ic_launcher_fg), null, Modifier.size(96.dp))
+        Image(painterResource(R.drawable.presence_mark), null, Modifier.size(96.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(androidx.compose.material3.MaterialTheme.colorScheme.primary))
         Text("Presence", style = MaterialTheme.typography.headlineLarge)
         CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
     }

@@ -86,7 +86,7 @@ s=s.replace('.padding(horizontal = LocalUiLayout.current.margin, vertical = if (
 s=s.replace('        Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)', '        LocalHeaderDrag.current(Modifier.weight(1f).height(if (compact) 40.dp else 56.dp)) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis) } }')
 (out/'Design.kt').write_text(s,encoding='utf-8')
 (out/'L10n.kt').write_text(base((ui/'L10n.kt').read_text(encoding='utf-8')).replace('System colors follow your wallpaper on Android 12+. Older devices use Grove. Or choose a fixed palette.', 'Choose a color palette.'),encoding='utf-8')
-s=base((ui/'Introduction.kt').read_text(encoding='utf-8')).replace('import app.presence.R\n','').replace('R.drawable.ic_launcher_fg', '"presence.png"')
+s=base((ui/'Introduction.kt').read_text(encoding='utf-8')).replace('import app.presence.R\n','').replace('R.drawable.presence_mark', '"presence-mark.png"')
 (out/'Introduction.kt').write_text(s,encoding='utf-8')
 s=base((ui/'Theme.kt').read_text(encoding='utf-8'))
 s=s.replace('platformColorScheme(androidx.compose.ui.platform.LocalContext.current, dark, palette)', 'presenceColorScheme(dark, palette)')
