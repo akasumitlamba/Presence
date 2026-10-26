@@ -86,4 +86,5 @@ Website overflow checks passed at 320, 375, 768, 1024, 1440, and 1920px; all ele
 dark palettes meet 4.5:1 for primary button, body, and secondary text colors.
 Native package and launcher checks passed in
 [run 40329582839](https://github.com/akasumitlamba/Presence/actions/runs/40329582839).
-The physical tablet was not connected to ADB during this follow-up.
+The physical Android 10 tablet was reconnected and updated in place through ADB;
+installed version 1.1.1 (25) was confirmed.
