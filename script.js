@@ -11,7 +11,7 @@
       "muted": "#24382e"
     },
     "dark": {
-      "accent": "#a9c7b5",
+      "accent": "#8fe0c4",
       "bg": "#111315",
       "text": "#f3f4f3",
       "surface": "#1b1e21",
@@ -27,7 +27,7 @@
       "muted": "#243038"
     },
     "dark": {
-      "accent": "#8ca6c2",
+      "accent": "#9ccaff",
       "bg": "#101418",
       "text": "#f4f7fa",
       "surface": "#1a222c",
@@ -43,7 +43,7 @@
       "muted": "#2c2438"
     },
     "dark": {
-      "accent": "#ae9ac2",
+      "accent": "#d8b4fe",
       "bg": "#141018",
       "text": "#f6f4fa",
       "surface": "#241c2c",
@@ -59,7 +59,7 @@
       "muted": "#2a3036"
     },
     "dark": {
-      "accent": "#9ea6ae",
+      "accent": "#bccbdd",
       "bg": "#121416",
       "text": "#f4f6f8",
       "surface": "#1e2226",
@@ -75,7 +75,7 @@
       "muted": "#3a2830"
     },
     "dark": {
-      "accent": "#c498a0",
+      "accent": "#ffb1c1",
       "bg": "#181012",
       "text": "#faf4f6",
       "surface": "#22181c",
@@ -91,7 +91,7 @@
       "muted": "#3a3024"
     },
     "dark": {
-      "accent": "#b0a288",
+      "accent": "#f4ca80",
       "bg": "#16140f",
       "text": "#f8f4ee",
       "surface": "#1e1a14",
@@ -107,7 +107,7 @@
       "muted": "#2c3820"
     },
     "dark": {
-      "accent": "#9eaa8a",
+      "accent": "#bedd8b",
       "bg": "#121610",
       "text": "#f4f7f0",
       "surface": "#161c12",
@@ -123,7 +123,7 @@
       "muted": "#282838"
     },
     "dark": {
-      "accent": "#9ca0c8",
+      "accent": "#bec2ff",
       "bg": "#101016",
       "text": "#f4f4fa",
       "surface": "#14161e",
@@ -139,7 +139,7 @@
       "muted": "#3a2820"
     },
     "dark": {
-      "accent": "#ba9c8c",
+      "accent": "#ffb692",
       "bg": "#161210",
       "text": "#faf4f0",
       "surface": "#1c1612",
@@ -155,7 +155,7 @@
       "muted": "#24383c"
     },
     "dark": {
-      "accent": "#8aaeb4",
+      "accent": "#89d5e3",
       "bg": "#101416",
       "text": "#f2f7f8",
       "surface": "#141a1c",
@@ -171,7 +171,7 @@
       "muted": "#242834"
     },
     "dark": {
-      "accent": "#949cae",
+      "accent": "#b6c8f4",
       "bg": "#101216",
       "text": "#f4f6f8",
       "surface": "#14181e",

@@ -425,8 +425,8 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
     val worked = elapsedWork(snap, System.currentTimeMillis(), SystemClock.elapsedRealtime())
     val logged = (if (open) snap.projectId else project?.id)?.let { workedMillisFor(rows, it) } ?: 0L
     val spent = logged + if (snap.status in setOf("running", "paused") && snap.kind in setOf("focus", "track")) worked else 0L
-    val controls: @Composable () -> Unit = {
-        SectionCard(spacing = 8.dp) {
+    val controls: @Composable (Boolean) -> Unit = { spacious ->
+        SectionCard(spacing = if (spacious) 24.dp else 12.dp) {
             if (!immersive) {
             Box {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
@@ -465,14 +465,14 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
                         "awaiting" -> app.center.start(snap.awaitingKind.ifBlank { "focus" }, project, task)
                         else -> if (project != null) app.center.start("focus", project, task) else { actionError = t.needProject; creating = projects.isEmpty() }
                     }
-                } }, enabled = true, modifier = Modifier.weight(1f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                } }, enabled = true, modifier = Modifier.weight(1f).heightIn(min = if (spacious) 56.dp else 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
                     Text(if (snap.status == "running") t.pause else t.play, maxLines = 2, textAlign = TextAlign.Center)
                 }
-                if (!open && project != null) TonalButton({ act { app.center.start("track", project, task) } }, Modifier.weight(1f).heightIn(min = 48.dp)) { Text(t.trackTime) }
-                if (open) TonalButton({ act { app.center.stop() } }, Modifier.weight(1f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                if (!open && project != null) TonalButton({ act { app.center.start("track", project, task) } }, Modifier.weight(1f).heightIn(min = if (spacious) 56.dp else 48.dp)) { Text(t.trackTime) }
+                if (open) TonalButton({ act { app.center.stop() } }, Modifier.weight(1f).heightIn(min = if (spacious) 56.dp else 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
                     Text(t.stop)
                 }
-                if (snap.status in setOf("running", "paused") && snap.kind != "track") TonalButton({ act { app.center.skip() } }, Modifier.weight(1f).heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                if (snap.status in setOf("running", "paused") && snap.kind != "track") TonalButton({ act { app.center.skip() } }, Modifier.weight(1f).heightIn(min = if (spacious) 56.dp else 48.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
                     Text(t.skip, maxLines = 2)
                 }
             }
@@ -539,12 +539,12 @@ private fun TimerPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         }
         if (maxHeight < 180.dp) Column(Modifier.fillMaxSize().padding(bottom = 48.dp).presenceScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${phase(t, snap.kind)} · ${clockDigits(face)}", style = MaterialTheme.typography.titleLarge)
-            controls()
+            controls(false)
         } else if (columns) Row(Modifier.fillMaxSize().padding(bottom = 48.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { ring() }
-            Column(Modifier.weight(1f).widthIn(max = 440.dp).presenceScroll(rememberScrollState())) { controls() }
+            Column(Modifier.weight(1f).presenceScroll(rememberScrollState())) { controls(true) }
         } else Column(Modifier.fillMaxSize().padding(bottom = 48.dp).presenceScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, if (immersive) Alignment.CenterVertically else Alignment.Top)) {
-            ring(); controls(); Spacer(Modifier.height(8.dp))
+            ring(); controls(false); Spacer(Modifier.height(8.dp))
         }
 
     }
@@ -1135,12 +1135,6 @@ private fun StatsPage(app: PresenceApp, t: T, rows: List<Rec>, premium: Boolean,
         item(key = "streak") { SectionCard(t.streak) {
             Text(t.streakLine(streakDays(rows, System.currentTimeMillis(), zone, dayStart), loggedToday(rows, System.currentTimeMillis(), zone, dayStart)), style = MaterialTheme.typography.titleMedium)
         } }
-        item(key = "actions") {
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TonalButton({ share() }, Modifier.weight(1f).fillMaxHeight()) { Icon(Icons.Rounded.Share, null); Spacer(Modifier.width(8.dp)); Text("${t.share} · ${listOf(t.today,t.week,t.month,t.year)[range]}") }
-                TonalButton({ add() }, Modifier.weight(1f).fillMaxHeight()) { Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(8.dp)); Text(t.manual) }
-            }
-        }
         item(key = "totals") {
             Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionCard(modifier = Modifier.weight(1f).fillMaxHeight()) { Metric(t.focusTime, clockWords(total), Modifier.fillMaxWidth(), centered = true) }
